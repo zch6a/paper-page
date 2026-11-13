@@ -80,3 +80,50 @@ Tests: 38 (were 28). ruff, mypy clean.
 
 Next: round 2 (an independent review; arXiv affiliations and `\teaser` blocks in more papers; a page made with
 `--tex` from a real project layout).
+
+### 2026-11-13 — polishing round 2
+
+**Five more real papers** (Instant NGP, DreamBooth, ControlNet, LoRA, DPO) and `--tex` on a real project layout
+(ControlNet's source written out in the scratchpad):
+
+1. ControlNet's teaser was its block diagram: CVPR/ICCV papers put the teaser in the title block as
+   `\includegraphics` + `\captionof{figure}` inside `\twocolumn[...]`, outside any figure environment. Those are
+   figures now, in document order. DreamBooth's real first figure came back too.
+2. DreamBooth listed "Project page" twice (the comment and the abstract each named one; the check compared against a
+   list that never grew): one link of each kind, the comment's first.
+3. `--tex` printed an empty "links:" line and found no links: the abstract's links are taken, "none" said otherwise.
+
+`--tex` on ControlNet's layout: the authors from `Lvmin Zhang, Anyi Rao, and Maneesh Agrawala\\ Stanford`, the
+abstract and the converted teaser, all right.
+
+**First independent review** (13: 12 confirmed, 1 plausible, all fixed; tests in `tests/test_review_round1.py`).
+The page's HTML held up (escaping, the accent color, links); the input side did not:
+
+1. A gzip bomb inflated whole in memory (a 199 KB source took 437 MB): decompressed in one bounded step, refused past
+   250 MB (the page is still made, without figures).
+2. A corrupt archive crashed with a zlib traceback: it is no source now.
+3. `--tex` followed symbolic links out of the project and published what they pointed to: links, and files reached
+   through them, are skipped.
+4. Two files that `\input` each other many times multiplied (k=6: 556 M characters, 56 s): each file once, within a
+   size budget.
+5. An unclosed `\begin{figure}` made the figure search quadratic (512 KB: 22 s): environments are paired in one pass.
+6. A macro containing itself grew as k³ (600 bytes → 54 M characters): expansion stops when it runs away.
+7. (plausible) A `--tex` file in a big folder read everything under it: 250 MB at most.
+8. The venue was guessed for submissions, workshops and tracks ("NeurIPS 2023 submission" → NeurIPS 2023): not any
+   more, as the README promised ("never guessed").
+9. Letters were lost: `Mart\'{\i}nez`, `Bj\o rn`, `Stra\ss e`, `\AA`, `\LaTeX`, and URLs in abstracts were treated
+   as TeX (`~ada/model_2` → ` ada/model₂`): special letters and logos handled, URLs left as they are.
+10. Authors: LNCS's `\inst{1}` made every name be dropped; acmart's one `\author` per author kept only the first: both
+    read now.
+11. BibTeX escaped only & and %: `# _ $ ~ ^` too; "Ada Example Jr." gave the key `jr2024...` and `Jr., Ada Example`:
+    suffixes are handled (`Example, Jr., Ada`).
+12. A write that failed (a lone surrogate in page.json) emptied the old index.html: files are encoded first and
+    replaced only when complete.
+13. A figure path `figures/%2e%2e/%2e%2e/x.png` (a browser reads `..`) or with a tab hiding a scheme passed: refused.
+
+Also from the review: `new` overwrote someone's own `figures/fig-1.png` when there was no page.json; it now refuses
+without `--force`. The workflows were found sound.
+
+Tests: 60 (were 38). ruff, mypy clean.
+
+Next: round 3.

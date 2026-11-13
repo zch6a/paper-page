@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from .arxiv import ARXIV, ATOM
 from .convert import Converter
 from .model import Author, Figure, Link, Page
-from .tex import WEB_IMAGES, command_arg, expand, figures, find_image, graphicspath, macros, main_file, to_text, use_macros
+from .tex import WEB_IMAGES, all_args, command_arg, expand, figures, find_image, graphicspath, macros, main_file, to_text, use_macros
 
 URL = re.compile(r"https?://[^\s<>\"'{}\\]+")
 
@@ -39,7 +39,9 @@ def from_entry(entry: ET.Element, arxiv_id: str) -> Page:
         categories.insert(0, primary.get("term", ""))
     doi = (entry.findtext(f"{ARXIV}doi") or "").strip()
     links = [Link("arXiv", f"https://arxiv.org/abs/{arxiv_id}"), Link("PDF", f"https://arxiv.org/pdf/{arxiv_id}")]
-    links += [x for x in found_links(comment) + found_links(abstract_tex) if x.label not in {y.label for y in links}]
+    for x in found_links(comment) + found_links(abstract_tex):  # the comment's first; one link of each kind
+        if x.label not in {y.label for y in links}:
+            links.append(x)
     if doi:
         links.insert(1, Link("DOI", f"https://doi.org/{doi}"))
     page = Page(
@@ -133,10 +135,17 @@ def venue_of(comment: str) -> str:
     'ECCV 2020 (oral)'
     >>> venue_of("15 pages, 5 figures. Accepted to NeurIPS 2023"), venue_of("12 pages, 3 figures"), venue_of("v2: typos fixed")
     ('NeurIPS 2023', '', '')
+    >>> venue_of("NeurIPS 2023 submission"), venue_of("Accepted at the ICML 2023 Workshop on X"), venue_of("Submitted to CVPR 2024")
+    ('', '', '')
     """
     for pattern in (VENUE_START, VENUE_ANY):
         m = pattern.search(comment)
         if m and re.search(r"(?:19|20)\d{2}", m.group(1)) and not re.match(r"(?i)(pages?|figures?|tables?|v\d)", m.group(1)):
+            after, before = comment[m.end(1) : m.end(1) + 40].lower(), comment[max(0, m.start(1) - 40) : m.start(1)].lower()
+            if re.match(
+                r"\W*(?:[a-z]+\W+){0,4}?(workshops?|submission|track|tutorial|competition|challenge|demo|findings|doctoral)\b", after
+            ) or re.search(r"\b(submitted|submission|under review|workshops?|findings|rejected)\b", before):
+                return ""  # a submission, a workshop or a track is not the conference: never guessed
             return " ".join(m.group(1).split())
     return ""
 
@@ -157,7 +166,7 @@ def bibtex(page: Page) -> str:
     }
     """
     year = page.published[:4]
-    first = page.authors[0].name.split()[-1] if page.authors else "anon"
+    first = _last(page.authors[0].name) if page.authors else "anon"
     words = [
         w
         for w in re.findall(r"[A-Za-z0-9]+", _ascii(page.title))
@@ -184,12 +193,42 @@ def _ascii(s: str) -> str:
 
 
 def _bib(s: str) -> str:
-    return s.replace("\\", "").replace("{", "").replace("}", "").replace("&", r"\&").replace("%", r"\%")
+    r"""Text as a BibTeX value: braces and backslashes dropped, LaTeX's special characters escaped.
+
+    >>> _bib("Fast C# code_gen for 100$ & 50% with ~ and ^")
+    'Fast C\\# code\\_gen for 100\\$ \\& 50\\% with \\textasciitilde{} and \\textasciicircum{}'
+    """
+    s = s.replace("\\", "").replace("{", "").replace("}", "")
+    for c in "&%#_$":
+        s = s.replace(c, "\\" + c)
+    return s.replace("~", r"\textasciitilde{}").replace("^", r"\textasciicircum{}")
+
+
+SUFFIXES = {"jr", "jr.", "sr", "sr.", "ii", "iii", "iv"}
+
+
+def _split_name(name: str) -> tuple[str, str, str]:
+    """(first names, last name, suffix): "Ada Example Jr." is ("Ada", "Example", "Jr.")."""
+    parts = name.split()
+    suffix = parts.pop() if len(parts) > 2 and parts[-1].lower().rstrip(",") in SUFFIXES else ""
+    parts[-1] = parts[-1].rstrip(",")
+    return " ".join(parts[:-1]), parts[-1], suffix.rstrip(",")
+
+
+def _last(name: str) -> str:
+    return _split_name(name)[1]
 
 
 def _last_first(name: str) -> str:
-    parts = name.split()
-    return name if len(parts) < 2 else f"{parts[-1]}, {' '.join(parts[:-1])}"
+    """BibTeX's "Last, Jr., First" form.
+
+    >>> _last_first("Ada Example"), _last_first("Ada Example Jr."), _last_first("Plato")
+    ('Example, Ada', 'Example, Jr., Ada', 'Plato')
+    """
+    if len(name.split()) < 2:
+        return name
+    first, last, suffix = _split_name(name)
+    return f"{last}, {suffix}, {first}" if suffix else f"{last}, {first}"
 
 
 # --- figures and local TeX ---
@@ -263,12 +302,15 @@ def from_tex(files: dict[str, bytes], main: str | None = None) -> Page:
     title = to_text(re.sub(r"\\(?:thanks|footnote)\{[^{}]*\}", "", command_arg(tex, "title") or "").replace("\\\\", " "))
     if not title:
         raise ValueError(f"{main}: no \\title")
-    authors = [Author(n) for n in author_names(command_arg(tex, "author") or "")]
+    blocks = all_args(tex, "author")
+    # acmart and others give each author an \author of their own: the first name of each; else one block of all
+    names = [n for b in blocks for n in author_names(b)[:1]] if len(blocks) > 1 else author_names(blocks[0] if blocks else "")
+    authors = [Author(n) for n in names]
     abstract = ""
     m = re.search(r"\\begin\{abstract\}(.*?)\\end\{abstract\}", tex, flags=re.S)
     if m:
         abstract = to_text(m.group(1))
-    page = Page(title=title, authors=authors, abstract=abstract)
+    page = Page(title=title, authors=authors, abstract=abstract, links=found_links(m.group(1)) if m else [])
     page.bibtex = bibtex(page)
     return page
 
@@ -280,8 +322,12 @@ def author_names(block: str) -> list[str]:
     ['Ada Example', 'Bo Sample']
     >>> author_names(r"Ada Example, Bo Sample and Cy Test")
     ['Ada Example', 'Bo Sample', 'Cy Test']
+    >>> author_names(r"Ada Example\inst{1} \and Bo Sample\inst{2}")
+    ['Ada Example', 'Bo Sample']
     """
-    block = re.sub(r"\\(?:thanks|footnote|footnotemark|affiliation|email|orcid)\s*(?:\[[^\]]*\])?\{[^{}]*\}", "", block)
+    block = re.sub(
+        r"\\(?:thanks|footnote|footnotemark|affiliation|email|orcid|orcidlink|inst|IEEEauthorrefmark|affil)\s*(?:\[[^\]]*\])?\{[^{}]*\}", "", block
+    )
     block = re.sub(r"\$[^$]*\$|\\textsuperscript\{[^{}]*\}|\\footnotemark(\[[^\]]*\])?", "", block)
     parts = re.split(r"\\and\b", block, flags=re.I)  # \and, \And (NeurIPS), \AND
     names: list[str] = []

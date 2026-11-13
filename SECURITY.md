@@ -7,13 +7,18 @@
   User-Agent names the tool, not the user. Nothing about you is sent.
 - **The source is never extracted.** The archive is read in memory; a name that would leave it (`../x`, `/x`, `C:/x`),
   a link or a device is ignored; only the images chosen for the page are written, under names paper-page makes
-  (`figures/fig-1.png`). Sizes are capped (60 MB download, 25 MB a file).
+  (`figures/fig-1.png`). Sizes are capped: 60 MB downloaded, 250 MB once decompressed (a gzip bomb is refused before
+  it is inflated), 25 MB a file; a corrupt archive counts as no source.
+- **A `--tex` project is read as it is**: its own files only. A symbolic link, or a file reached through one, is
+  skipped (it could point anywhere on your disk), and at most 250 MB is read.
+- **Odd TeX cannot run away**: each `\input` file is included once, the whole within a size budget; figure
+  environments are found in one pass; a macro that contains itself stops expanding.
 - **PDF figures** are converted by running poppler's `pdftoppm` when it is installed (`--no-convert` turns this
   off): a fixed program and arguments, no shell, a 60-second limit, the PDF in a temporary folder removed afterwards.
   The PDF is the paper's own figure from arXiv; `pdftoppm` is your installed copy, as up to date as you keep it.
 - **The page is inert to the data.** Every text from arXiv or `page.json` is HTML-escaped; a link is written only when
-  it is `http(s)`, a figure only when it is a path inside the page's folder or an `https` URL; anything else is left
-  out and reported. The page loads no fonts, scripts or styles from elsewhere; its one script copies the BibTeX.
+  it is `http(s)`, a figure only when it is a path inside the page's folder or an `https` URL (percent-encoded dots
+  and control characters refused); anything else is left out and reported. Files are written whole or not at all. The page loads no fonts, scripts or styles from elsewhere; its one script copies the BibTeX.
 - **Your edits are kept.** `new` refuses to overwrite an existing `page.json` without `--force`.
 
 ## What it does not protect against

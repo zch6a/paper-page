@@ -299,3 +299,19 @@ def test_force_clears_the_old_figures_paper_page_made_and_nothing_else(tmp_path:
     assert cli.main(["new", "2401.01234", "-o", str(out), "--force"]) == 0
     assert sorted(p.name for p in (out / "figures").iterdir()) == ["fig-1.png", "fig-2.jpg", "fig-notes.txt", "my-diagram.png"]
     assert (out / "figures" / "fig-2.jpg").read_bytes() != b"old"
+
+
+def test_one_link_of_each_kind_when_the_comment_and_the_abstract_both_name_one() -> None:
+    atom = ATOM.replace("Accepted to CVPR 2024 (highlight). 12 pages, 9 figures", "Project page: https://example.org/tiny")
+    atom = atom.replace("Video: https://youtu.be/abc123.", "See https://example.org/other for more.")
+    page = from_entry(entry_of(atom.encode(), "2401.01234"), "2401.01234")
+    assert [x.label for x in page.links].count("Project page") == 1 and ("Project page", "https://example.org/tiny") in [
+        (x.label, x.url) for x in page.links
+    ]
+
+
+def test_a_tex_project_keeps_the_links_its_abstract_names() -> None:
+    files = {
+        "p.tex": rb"""\documentclass{article}\title{T}\begin{document}\begin{abstract}Code: \url{https://github.com/a/b}.\end{abstract}\end{document}"""
+    }
+    assert [(x.label, x.url) for x in from_tex(files).links] == [("Code", "https://github.com/a/b")]

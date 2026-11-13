@@ -9,6 +9,7 @@ import datetime as dt
 import html
 import posixpath
 import re
+import urllib.parse
 
 from . import __version__
 from .model import Figure, Page
@@ -36,12 +37,15 @@ def safe_url(url: str) -> str:
 def safe_src(src: str) -> str:
     """A figure's src when it is a path inside the page's folder or an https URL, else ""."""
     s = src.strip()
+    if re.search(r"[\x00-\x20\x7f]", s):
+        return ""  # a tab or newline inside could hide a scheme ("java\tscript:") from the check
     if re.match(r"^https://[^\s<>\"]+$", s, flags=re.I):
         return s
-    if re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:", s) or s.startswith(("/", "\\")) or not s:
+    plain = urllib.parse.unquote(s).replace("\\", "/")  # %2e%2e is .. to a browser
+    if re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:", plain) or plain.startswith("/") or not s:
         return ""
-    norm = posixpath.normpath(s.replace("\\", "/"))
-    return "" if norm.startswith("..") else norm
+    norm = posixpath.normpath(plain)
+    return "" if norm == ".." or norm.startswith("../") or "/../" in f"/{norm}/" else posixpath.normpath(s.replace("\\", "/"))
 
 
 def _icon(label: str) -> str:

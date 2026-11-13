@@ -4,12 +4,12 @@ file with its \input files, and its figures (the image each includes, and its ca
 
 from __future__ import annotations
 
-import gzip
 import io
 import posixpath
 import re
 import tarfile
 import unicodedata
+import zlib
 from dataclasses import dataclass
 
 GREEK = {name: chr(code) for name, code in (
@@ -28,6 +28,9 @@ SYMBOLS = {
 }  # fmt: skip
 SUP = str.maketrans("0123456789+-=()niT", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿⁱᵀ")
 SUB = str.maketrans("0123456789+-=()aehijklmnoprstuvx", "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐₑₕᵢⱼₖₗₘₙₒₚᵣₛₜᵤᵥₓ")
+LETTERS = {"o": "ø", "O": "Ø", "ss": "ß", "aa": "å", "AA": "Å", "ae": "æ", "AE": "Æ", "oe": "œ", "OE": "Œ", "l": "ł", "L": "Ł",
+           "i": "ı", "j": "ȷ", "LaTeX": "LaTeX", "TeX": "TeX", "LaTeXe": "LaTeX2e", "BibTeX": "BibTeX"}  # fmt: skip
+URL_TEXT = re.compile(r"https?://[^\s{}\\]+")
 ACCENTS = {"'": "\u0301", "`": "\u0300", '"': "\u0308", "^": "\u0302", "~": "\u0303", "c": "\u0327", "v": "\u030c", "=": "\u0304", "u": "\u0306"}
 
 
@@ -40,7 +43,21 @@ def to_text(s: str) -> str:
     '“Neural” fields – fast, 95% of the time, by Schrödinger'
     >>> to_text(r"{\small Generated samples} at $\log p(x)$, \centering done")
     'Generated samples at log p(x), done'
+    >>> to_text(r"Mart\'{\i}nez, Bj\o rn, Stra\ss e, \AA ngstr\"om, \LaTeX{} at http://cs.example.edu/~ada/model_2")
+    'Martínez, Bjørn, Straße, Ångström, LaTeX at http://cs.example.edu/~ada/model_2'
     """
+    parts = URL_TEXT.split(s)  # a URL is kept as it is: its ~ and _ are not TeX
+    urls = URL_TEXT.findall(s)
+    return (
+        "".join(_text(p) + (" " + u + " " if i < len(urls) else "") for i, (p, u) in enumerate(zip(parts, [*urls, ""], strict=True)))
+        .strip()
+        .replace(" ,", ",")
+        .replace(" .", ".")
+    )
+
+
+def _text(s: str) -> str:
+    s = re.sub(r"\\([`'\"^~=])\s*\{?\\([ij])\}?(?![A-Za-z])", lambda m: m.group(2) + ACCENTS[m.group(1)], s)  # \'{\i}: í
     # references and revision marks go with their arguments: \cite{key} must not leave "key" in the text
     s = re.sub(r"~?\\(?:cite[a-z]*|nocite|ref|eqref|autoref|cref|Cref|pageref|label|sout|st|xout)\*?\s*(?:\[[^\]]*\]\s*)*\{[^{}]*\}", "", s)
     s = re.sub(r"\\([`'\"^~=])\{?([A-Za-z])\}?", lambda m: m.group(2) + ACCENTS[m.group(1)], s)
@@ -72,6 +89,8 @@ OPERATORS = {"log", "exp", "ln", "max", "min", "arg", "sin", "cos", "tan", "lim"
 def _command(m: re.Match[str]) -> str:
     """A command left after the rest: a symbol (keeping the space after it), an operator's name, or nothing."""
     name, space = m.group(1), m.group(2)
+    if name in LETTERS:
+        return LETTERS[name]  # a letter: the space after it only ends the command (Bj\o rn)
     symbol = GREEK.get(name) or SYMBOLS.get(name)
     if symbol:
         return symbol + space
@@ -94,15 +113,21 @@ MAX_TOTAL = 250 * 1024 * 1024
 KEEP = (".tex", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".pdf", ".eps", ".bbl", ".sty", ".cls")
 
 
+class SourceTooLarge(ValueError):
+    pass
+
+
 def read_source(blob: bytes) -> dict[str, bytes]:
     """The files of an arXiv source, by their normalized path in it (a gzipped or plain tar, or one gzipped TeX file);
     {} when it is not a source (a PDF, say). Read in memory; names that leave the archive (../x, /x) are dropped."""
     data = blob
     if blob[:2] == b"\x1f\x8b":
-        try:
-            data = gzip.decompress(blob)
-        except (OSError, EOFError):
-            return {}
+        try:  # at most MAX_TOTAL bytes out, however small the download: a gzip bomb is refused, not inflated
+            data = zlib.decompressobj(16 + zlib.MAX_WBITS).decompress(blob, MAX_TOTAL + 1)
+        except zlib.error:
+            return {}  # a corrupt archive: no source
+        if len(data) > MAX_TOTAL:
+            raise SourceTooLarge(f"the source is larger than {MAX_TOTAL // 2**20} MB uncompressed: not read")
     if data[:5] == b"%PDF-":
         return {}
     files: dict[str, bytes] = {}
@@ -170,19 +195,33 @@ def main_file(files: dict[str, bytes]) -> str | None:
     return mains[0]
 
 
-def expand(name: str, files: dict[str, bytes], depth: int = 0) -> str:
-    r"""The file with its \input and \include files in place (comments stripped), as far as they are in the source."""
-    tex = strip_comments(decode(files.get(name, b"")))
+MAX_TEX = 8_000_000  # characters of TeX after \input: a paper is a few hundred thousand
+
+
+def expand(name: str, files: dict[str, bytes], depth: int = 0, seen: set[str] | None = None) -> str:
+    r"""The file with its \input and \include files in place (comments stripped), as far as they are in the source;
+    each file once (two files that input each other many times cannot multiply), the whole at most MAX_TEX characters.
+
+    >>> files = {"a.tex": rb"\input{b}\input{b}x", "b.tex": rb"\input{a}y"}
+    >>> expand("a.tex", files)
+    'yx'
+    """
+    seen = {name} if seen is None else seen
+    tex = strip_comments(decode(files.get(name, b"")))[:MAX_TEX]
     if depth > 8:
         return tex
     base = posixpath.dirname(name)
+    size = [len(tex)]
 
     def inline(m: re.Match[str]) -> str:
         target = m.group(1).strip()
         for candidate in (target, target + ".tex", posixpath.join(base, target), posixpath.join(base, target) + ".tex"):
             c = posixpath.normpath(candidate)
-            if c in files and c != name:
-                return expand(c, files, depth + 1)
+            if c in files and c not in seen:
+                seen.add(c)
+                text = expand(c, files, depth + 1, seen)[: max(0, MAX_TEX - size[0])]
+                size[0] += len(text)
+                return text
         return ""
 
     return re.sub(r"\\(?:input|include|subfile)\s*\{([^{}]+)\}", inline, tex)
@@ -218,20 +257,58 @@ def command_arg(tex: str, command: str) -> str | None:
     return braced(tex, m.end() - 1)[0]
 
 
+def all_args(tex: str, command: str) -> list[str]:
+    r"""The first argument of every \command, in order.
+
+    >>> all_args(r"\author{Ada}\affiliation{X}\author[B]{Bo}", "author")
+    ['Ada', 'Bo']
+    """
+    return [braced(tex, m.end() - 1)[0] for m in re.finditer(r"\\" + command + r"\*?\s*(?:\[[^\]]*\]\s*)?\{", tex)]
+
+
 @dataclass
 class TexFigure:
     image: str  # the path as \includegraphics names it
     caption: str  # as TeX
 
 
+GRAPHICS = re.compile(r"\\includegraphics\s*(?:\[[^\]]*\])?\s*\{([^{}]+)\}")
+
+
 def figures(tex: str) -> list[TexFigure]:
-    r"""Each figure (and figure*, teaser) environment's first \includegraphics and its caption, in order."""
-    out = []
-    for m in re.finditer(r"\\begin\{(figure\*?|teaserfigure|wrapfigure)\}(.*?)\\end\{\1\}", tex, flags=re.S):
-        body = m.group(2)
-        g = re.search(r"\\includegraphics\s*(?:\[[^\]]*\])?\s*\{([^{}]+)\}", body)
+    r"""The figures in the order the paper has them: each figure (figure*, teaserfigure, wrapfigure) environment's
+    first \includegraphics and its caption, and each \captionof{figure} outside them with the \includegraphics just
+    before it (CVPR and ICCV papers put the teaser in the title block that way).
+
+    >>> [f.image for f in figures(r"\maketitle\begin{center}\includegraphics{tea}\captionof{figure}{T.}\end{center}"
+    ...                                r"\begin{figure}\includegraphics{two}\caption{Two.}\end{figure}")]
+    ['tea', 'two']
+    """
+    found: list[tuple[int, TexFigure]] = []
+    spans = []
+    opened: list[re.Match[str]] = []
+    for t in re.finditer(r"\\(begin|end)\{(figure\*?|teaserfigure|wrapfigure)\}", tex):  # paired in one pass
+        if t.group(1) == "begin":
+            opened.append(t)
+            continue
+        if not opened or opened[-1].group(2) != t.group(2):
+            continue
+        o = opened.pop()
+        if opened:
+            continue  # inside another figure: that one counts
+        spans.append((o.start(), t.end()))
+        body = tex[o.end() : t.start()]
+        g = GRAPHICS.search(body)
         if g:
-            out.append(TexFigure(g.group(1).strip(), command_arg(body, "caption") or ""))
+            found.append((o.start(), TexFigure(g.group(1).strip(), command_arg(body, "caption") or "")))
+    for m in re.finditer(r"\\captionof\s*\{figure\}\s*(?:\[[^\]]*\]\s*)?\{", tex):
+        if any(a <= m.start() < b for a, b in spans):
+            continue
+        before = list(GRAPHICS.finditer(tex, max(0, m.start() - 2000), m.start()))
+        if before:
+            g = before[-1]
+            found.append((g.start(), TexFigure(g.group(1).strip(), braced(tex, m.end() - 1)[0])))
+    out = [f for _, f in sorted(found, key=lambda t: t[0])]
     teaser = re.search(r"\\teaser\s*\{", tex)  # some styles (ACM, CVPR teasers) put the teaser in the title block
     if teaser:
         body = braced(tex, teaser.end() - 1)[0]
@@ -266,8 +343,12 @@ def use_macros(text: str, own: dict[str, str]) -> str:
     if not own:
         return text
     pattern = re.compile(r"\\(" + "|".join(sorted(map(re.escape, own), key=len, reverse=True)) + r")(?![A-Za-z])(?:\{\})?")
+    limit = 4 * len(text) + 2000  # a macro that contains itself grows without end: stop before it does
     for _ in range(3):
-        text = pattern.sub(lambda m: own[m.group(1)], text)
+        more = pattern.sub(lambda m: own[m.group(1)][:500], text)
+        if len(more) > limit:
+            break
+        text = more
     return text
 
 

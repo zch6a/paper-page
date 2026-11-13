@@ -11,6 +11,7 @@ site_url (where the page will live: link previews then show the teaser). Publish
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 from pathlib import Path
@@ -21,9 +22,10 @@ from .convert import find_converter
 from .make import Figures, from_entry, from_tex, take_figures
 from .model import Page
 from .render import render
-from .tex import read_source
+from .tex import SourceTooLarge, read_source
 
 MAX_LOCAL_FILES = 5000
+MAX_LOCAL_BYTES = 250 * 2**20  # read from a --tex project at most (a paper's figures are a few dozen MB)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -76,13 +78,20 @@ def _new(args: argparse.Namespace) -> int:
         if args.figures:
             print(f"paper-page: fetching arXiv:{arxiv_id}{page.version}'s source for its figures (--figures 0 skips this)", file=sys.stderr)
             kind, blob = client.source(arxiv_id, version)
-            files = read_source(blob)
-            if not files:
+            try:
+                files = read_source(blob)
+            except SourceTooLarge as e:
+                print(f"paper-page: {e}: no figures taken", file=sys.stderr)
+                files = {}
+            if not files and blob:
                 print(f"paper-page: arXiv has no TeX source for {arxiv_id} ({kind or 'unknown type'}): no figures taken", file=sys.stderr)
         source_note = f"from arXiv:{arxiv_id}{page.version}"
     convert = None if args.no_convert else find_converter()
     figs = take_figures(files, args.figures, main_name, convert) if files else Figures()
     page.teaser, page.figures = figs.teaser, figs.figures
+    taken = [out / rel for rel in figs.images if (out / rel).exists()]
+    if taken and not args.force:
+        raise ValueError(f"{taken[0].as_posix()} exists: --force replaces the figures paper-page names (fig-N), or choose another -o")
     out.mkdir(parents=True, exist_ok=True)
     for old in (out / "figures").glob("fig-*.*") if args.force else ():
         if re.fullmatch(r"fig-\d+\.(png|jpg|gif|webp|svg)", old.name):  # only the files paper-page names: yours stay
@@ -97,7 +106,7 @@ def _new(args: argparse.Namespace) -> int:
     print(f"paper-page: {page.title}")
     print(f"  {len(page.authors)} author(s), {source_note}" + (f"; venue: {page.venue}" if page.venue else "; no venue named (set it in page.json)"))
     found = [x.label for x in page.links if x.label not in ("arXiv", "PDF", "DOI")]
-    print("  links: " + ", ".join(x.label for x in page.links) + ("" if found else " (add code, video, data in page.json)"))
+    print("  links: " + (", ".join(x.label for x in page.links) or "none") + ("" if found else " (add code, video, data in page.json)"))
     converted = f", {len(figs.converted)} of them converted from PDF with pdftoppm" if figs.converted else ""
     print(f"  figures: {len(figs.images)} taken{converted}" + (f" (teaser: {page.teaser.src})" if page.teaser else ""))
     if figs.teaser_skipped:
@@ -130,9 +139,12 @@ def _render(folder: Path) -> int:
 
 
 def _write(path: Path, text: str) -> None:
-    """UTF-8 with LF line ends on every system, so the same page.json makes the same file."""
-    with path.open("w", encoding="utf-8", newline="\n") as f:
-        f.write(text)
+    """UTF-8 with LF line ends on every system (the same page.json makes the same file), written whole or not at all:
+    the text is encoded first and the file replaced only once the new one is complete."""
+    data = text.encode("utf-8")  # a text that cannot be written fails here, before anything is touched
+    tmp = path.with_name(f".{path.name}.tmp")
+    tmp.write_bytes(data)
+    os.replace(tmp, path)
 
 
 def _local_files(main: Path) -> dict[str, bytes]:
@@ -141,14 +153,23 @@ def _local_files(main: Path) -> dict[str, bytes]:
         raise ValueError(f"{main.as_posix()}: no such file")
     root = main.resolve().parent
     files: dict[str, bytes] = {}
+    total = 0
     for p in sorted(root.rglob("*")):
-        if len(files) >= MAX_LOCAL_FILES:
+        if len(files) >= MAX_LOCAL_FILES or total > MAX_LOCAL_BYTES:
             break
+        if p.suffix.lower() not in (".tex", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".pdf", ".eps"):
+            continue
+        # a link (or a file reached through one) may point anywhere: only the project's own files are read
         if (
-            p.is_file()
-            and p.suffix.lower() in (".tex", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".pdf", ".eps")
-            and p.stat().st_size < 25 * 2**20
+            p.is_symlink()
+            or not p.is_file()
+            or not p.resolve().is_relative_to(root)
+            or any(q.is_symlink() for q in p.parents if q != root and root in q.parents)
         ):
+            continue
+        size = p.stat().st_size
+        if size < 25 * 2**20:
+            total += size
             files[p.relative_to(root).as_posix()] = p.read_bytes()
     name = main.resolve().relative_to(root).as_posix()
     # the main file the user named comes first, whatever the others are
