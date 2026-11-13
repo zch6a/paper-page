@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dist/
+build/
+*.egg-info/
+# pages made while trying the tool on real papers hold the authors' figures: never committed
+/page/
+/trial/
+*.pdf
+*.tar.gz

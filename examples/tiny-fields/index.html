@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tiny Fields: Learning α-Blended Scenes in O(n²) Time</title>
+<meta name="description" content="This is a made-up paper, for the example page. We present Tiny Fields, a scene representation small enough to fit in a cache line and fast enough to render a new view in real time. A field of a few hundred α-blended points, fitted to a handful of input views, renders at 95% of real time on a lapt…">
+<meta name="citation_title" content="Tiny Fields: Learning α-Blended Scenes in O(n²) Time">
+<meta name="citation_author" content="Ada Example">
+<meta name="citation_author" content="Bo Sample">
+<meta name="citation_author" content="Cy Test">
+<meta name="citation_publication_date" content="2024/01/03">
+<meta name="citation_arxiv_id" content="2401.01234">
+<meta name="citation_pdf_url" content="https://arxiv.org/pdf/2401.01234">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Tiny Fields: Learning α-Blended Scenes in O(n²) Time">
+<meta property="og:description" content="This is a made-up paper, for the example page. We present Tiny Fields, a scene representation small enough to fit in a cache line and fast enough to render a new view in real time. A field of a few hundred α-blended points, fitted to a handful of input views, renders at 95% of real time on a lapt…">
+<link rel="canonical" href="https://example.org/tiny-fields/">
+<meta property="og:url" content="https://example.org/tiny-fields/">
+<meta property="og:image" content="https://example.org/tiny-fields/figures/teaser.svg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="generator" content="paper-page 0.1.0">
+<style>
+:root{--bg:#fff;--fg:#1d2127;--muted:#5d6672;--line:#dfe3e8;--card:#f6f8fa;--accent:#2f6fdf;--tint:rgba(47,111,223,0.1)}
+@media (prefers-color-scheme:dark){:root{--bg:#101318;--fg:#e8ebef;--muted:#9aa3ad;--line:#2b313a;--card:#171b21;--tint:rgba(47,111,223,0.22)}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+header{background:linear-gradient(180deg,var(--tint),transparent);padding:56px 20px 28px;text-align:center}
+.inner{max-width:880px;margin:0 auto}
+.venue{display:inline-block;margin:0 0 14px;padding:3px 12px;border:1px solid var(--accent);border-radius:999px;color:var(--accent);font-size:14px;font-weight:600;letter-spacing:.02em}
+h1{font-size:clamp(28px,4.4vw,42px);line-height:1.18;margin:0 0 18px;letter-spacing:-.01em}
+.authors{font-size:18px;margin:0 0 6px}.author{white-space:nowrap}
+.authors a{color:var(--fg);text-decoration:none;border-bottom:1px solid var(--line)}.authors a:hover{color:var(--accent);border-color:var(--accent)}
+sup{font-size:.65em;color:var(--muted);margin-left:1px}
+.affiliations{color:var(--muted);font-size:15px;margin:0 0 4px}.affiliations span{margin:0 9px;display:inline-block}
+.byline{color:var(--muted);font-size:14px;margin:6px 0 0}
+.buttons{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin:22px 0 0}
+.button{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--fg);text-decoration:none;font-size:15px;font-weight:600}
+.button:hover{border-color:var(--accent);color:var(--accent)}.button:first-child{background:var(--accent);border-color:var(--accent);color:#fff}
+.button svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
+main{max-width:880px;margin:0 auto;padding:8px 20px 40px}
+section{margin:34px 0}
+h2{font-size:22px;margin:0 0 12px}
+.abstract{margin:0;text-align:justify;hyphens:auto}
+figure{margin:0 0 26px}img{display:block;max-width:100%;max-height:85vh;width:auto;height:auto;margin:0 auto;border-radius:6px}
+figcaption{color:var(--muted);font-size:15px;margin-top:10px}
+.cite{position:relative}
+pre{margin:0;padding:16px;background:var(--card);border:1px solid var(--line);border-radius:8px;overflow-x:auto;font:13.5px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+#copy{position:absolute;top:8px;right:8px;font:inherit;font-size:13px;padding:3px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);cursor:pointer}
+footer{max-width:880px;margin:0 auto;padding:18px 20px 40px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+footer a{color:var(--muted)}
+a{color:var(--accent)}
+@media (max-width:600px){body{font-size:16px}header{padding-top:36px}.abstract{text-align:left}.author{white-space:normal}}
+</style>
+</head>
+<body>
+<header><div class="inner">
+<p class="venue">An Example Conference 2024 (oral)</p>
+<h1>Tiny Fields: Learning α-Blended Scenes in O(n²) Time</h1>
+<p class="authors"><span class="author"><a href="https://example.org/ada">Ada Example</a><sup>1</sup></span>, <span class="author">Bo Sample<sup>2</sup></span>, <span class="author">Cy Test<sup>1,2</sup></span></p>
+<p class="affiliations"><span><sup>1</sup>Example University</span><span><sup>2</sup>Sample Lab</span></p>
+<p class="byline">arXiv:2401.01234v3 · posted 3 January 2024</p>
+<nav class="buttons"><a class="button" href="https://arxiv.org/abs/2401.01234"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5h5.5L13 5v9.5H4z"/><path d="M9.5 1.5V5H13"/><path d="M6 8h5M6 10.5h5"/></svg><span>arXiv</span></a><a class="button" href="https://arxiv.org/pdf/2401.01234"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5h5.5L13 5v9.5H4z"/><path d="M9.5 1.5V5H13"/><path d="M6 8h5M6 10.5h5"/></svg><span>PDF</span></a><a class="button" href="https://github.com/example/tiny-fields"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 4 1.5 8l4 4M10.5 4l4 4-4 4"/></svg><span>Code</span></a><a class="button" href="https://example.org/tiny-fields/video"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="3" width="13" height="10" rx="2"/><path d="M6.5 5.8v4.4L10.2 8z"/></svg><span>Video</span></a><a class="button" href="https://example.org/tiny-fields/data"><svg viewBox="0 0 16 16" aria-hidden="true"><ellipse cx="8" cy="3.5" rx="5.5" ry="2"/><path d="M2.5 3.5v9c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2v-9M2.5 8c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2"/></svg><span>Data</span></a></nav>
+</div></header>
+<main>
+<section class="teaser"><figure><img src="figures/teaser.svg" alt="Two input views of a scene, a small field of points, and a rendered new view."><figcaption>Tiny Fields fits a small field of α-blended points to a few input views, then renders a new view in real time.</figcaption></figure></section>
+<section><h2>Abstract</h2><p class="abstract">This is a made-up paper, for the example page. We present Tiny Fields, a scene representation small enough to fit in a cache line and fast enough to render a new view in real time. A field of a few hundred α-blended points, fitted to a handful of input views, renders at 95% of real time on a laptop and matches larger methods on three benchmarks. Code and data are available.</p></section>
+<section><h2>Citation</h2><div class="cite"><button type="button" id="copy">Copy</button><pre id="bibtex">@misc{example2024tiny,
+  title         = {{Tiny Fields: Learning α-Blended Scenes in O(n²) Time}},
+  author        = {Example, Ada and Sample, Bo and Test, Cy},
+  year          = {2024},
+  note          = {An Example Conference 2024 (oral)},
+  eprint        = {2401.01234},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CV},
+  url           = {https://arxiv.org/abs/2401.01234},
+}</pre></div></section>
+</main>
+<footer>Made with <a href="https://github.com/zch6a/paper-page">paper-page</a>.</footer>
+<script>
+"use strict";
+const copy = document.getElementById("copy");
+if (copy) copy.addEventListener("click", () => {
+  const text = document.getElementById("bibtex").textContent;
+  const done = () => { copy.textContent = "Copied"; setTimeout(() => { copy.textContent = "Copy"; }, 1500); };
+  if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, () => {});
+});
+</script>
+</body>
+</html>

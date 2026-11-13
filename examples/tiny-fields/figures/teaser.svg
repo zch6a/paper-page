@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 360" font-family="system-ui, -apple-system, Segoe UI, sans-serif">
+  <!-- A made-up figure for a made-up paper (the example page): input views, a field, a new view. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfe3ff"/><stop offset="1" stop-color="#f4f8ff"/></linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#2f6fdf" stop-opacity="0.55"/><stop offset="1" stop-color="#2f6fdf" stop-opacity="0"/></radialGradient>
+    <g id="scene">
+      <rect width="150" height="110" rx="8" fill="url(#sky)"/>
+      <ellipse cx="75" cy="96" rx="62" ry="10" fill="#b9c7da"/>
+      <rect x="32" y="52" width="40" height="40" rx="4" fill="#e0794f"/>
+      <circle cx="98" cy="70" r="22" fill="#3d9a6a"/>
+      <path d="M70 92 L86 40 L102 92 Z" fill="#f1c24a" opacity="0.9"/>
+    </g>
+  </defs>
+  <rect width="960" height="360" fill="#ffffff"/>
+  <g transform="translate(40 40)">
+    <use href="#scene" transform="translate(0 0) skewY(-4)"/>
+    <use href="#scene" transform="translate(18 130) skewY(3)"/>
+    <text x="80" y="290" text-anchor="middle" font-size="18" fill="#3a4250">Input views</text>
+  </g>
+  <path d="M250 180 H330" stroke="#5d6672" stroke-width="3" marker-end="url(#a)"/>
+  <defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5d6672"/></marker></defs>
+  <g transform="translate(350 50)">
+    <rect width="260" height="230" rx="16" fill="#f3f6fb" stroke="#d6dde8"/>
+    <circle cx="130" cy="115" r="105" fill="url(#glow)"/>
+    <g stroke="#2f6fdf" stroke-opacity="0.35">
+      <path d="M40 60 H220 M40 90 H220 M40 120 H220 M40 150 H220 M40 180 H220"/>
+      <path d="M60 40 V200 M100 40 V200 M140 40 V200 M180 40 V200 M220 40 V200"/>
+    </g>
+    <circle cx="96" cy="98" r="9" fill="#2f6fdf"/><circle cx="150" cy="130" r="13" fill="#2f6fdf" opacity="0.8"/>
+    <circle cx="120" cy="160" r="6" fill="#2f6fdf" opacity="0.6"/><circle cx="176" cy="88" r="7" fill="#2f6fdf" opacity="0.7"/>
+    <text x="130" y="262" text-anchor="middle" font-size="18" fill="#3a4250">A tiny field (α-blended)</text>
+  </g>
+  <path d="M630 180 H710" stroke="#5d6672" stroke-width="3" marker-end="url(#a)"/>
+  <g transform="translate(730 95)">
+    <use href="#scene" transform="scale(1.3)"/>
+    <text x="97" y="195" text-anchor="middle" font-size="18" fill="#3a4250">A new view, in real time</text>
+  </g>
+</svg>

@@ -1,0 +1,35 @@
+<!doctype html>
+<!-- The repository's social preview (1280×640): docs/social-preview.png, rendered from this page with headless Chrome
+     (scripts/screenshots.ps1). The page shown is the made-up example's, as paper-page makes it. -->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 1280px; height: 640px; overflow: hidden; }
+  body { background: radial-gradient(1100px 700px at 12% 8%, #13233d 0%, #12141a 55%, #0b0d11 100%); color: #e6edf3;
+    font-family: "Segoe UI", -apple-system, system-ui, sans-serif; display: grid; grid-template-columns: 450px 1fr; gap: 40px;
+    padding: 0 0 0 70px; box-sizing: border-box; align-items: center; }
+  h1 { font-size: 60px; margin: 0 0 16px; letter-spacing: -1.5px; }
+  h1 span { color: #58a6ff; }
+  .tag { font-size: 31px; line-height: 1.22; margin: 0 0 22px; font-weight: 600; }
+  .sub { font-size: 18.5px; line-height: 1.5; color: #b1bac4; margin: 0 0 22px; }
+  code { display: block; font: 15px/1.5 Consolas, ui-monospace, monospace; background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 10px 14px; color: #c9d1d9; margin: 0 0 24px; }
+  .pills { display: flex; gap: 9px; flex-wrap: wrap; }
+  .pills span { font-size: 14.5px; border: 1px solid #30363d; background: #161b22; border-radius: 999px; padding: 6px 12px; color: #c9d1d9; }
+  .shot { height: 560px; overflow: hidden; border: 1px solid #30363d; border-right: 0; border-radius: 10px 0 0 10px;
+    box-shadow: 0 18px 50px rgba(0,0,0,.55); }
+  .shot img { width: 860px; display: block; }
+</style>
+</head>
+<body>
+  <div>
+    <h1>paper-<span>page</span></h1>
+    <p class="tag">Your paper's project page, from its arXiv ID.</p>
+    <p class="sub">Links, teaser, abstract and BibTeX, with the tags Google Scholar and link previews read. One HTML file for GitHub Pages.</p>
+    <code>paper-page new 2003.08934</code>
+    <div class="pills"><span>arXiv</span><span>Light · dark</span><span>GitHub Pages</span><span>No dependencies</span></div>
+  </div>
+  <div class="shot"><img src="../docs/example-light.png" alt=""></div>
+</body>
+</html>
