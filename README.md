@@ -108,7 +108,8 @@ paper-page talks to arXiv only (`export.arxiv.org` for the metadata, `arxiv.org/
 every three seconds as arXiv asks, with a User-Agent naming the tool. The source is read in memory and never
 extracted: only the chosen images are written, under names it makes (`figures/fig-1.png`). A PDF figure is converted
 by running `pdftoppm` (no shell, a time limit, a temporary folder removed after). The page loads nothing
-from anywhere else; every text is escaped, and links must be http(s). See [SECURITY.md](SECURITY.md).
+from anywhere else; every text is escaped, links must be http(s), and its Content-Security-Policy lets only its own
+copy-button script run. See [SECURITY.md](SECURITY.md).
 
 ## Also in this toolkit
 

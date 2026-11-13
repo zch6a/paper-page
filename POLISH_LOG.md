@@ -152,3 +152,22 @@ unsafe link) give one clear line each. No dead code found.
 Tests: 65 (were 60). ruff, mypy clean.
 
 Next: round 4 (security and release configuration again, a fresh install, the README's first screen).
+
+### 2026-11-13 — polishing round 4
+
+Checked: a fresh `uvx --from git+https://github.com/zch6a/paper-page` install (`--version`, the help on a bare run);
+the only subprocess is the reviewed pdftoppm call (no shell, fixed arguments); versions agree (pyproject, package,
+plugin); the wheel holds the code only, the sdist leaves docs/ out (the example stays: the tests render it); the
+release workflow's notes extraction matches the dated CHANGELOG heading.
+
+**Defence in depth for the page**: every text was already escaped and links checked, but a page is published under the
+author's name, so it now carries a Content-Security-Policy: `default-src 'none'`, images from the page or https,
+inline styles, and `script-src` with the SHA-256 of the page's one script (the copy button), no base URI, no forms.
+Checked in a browser on the example: the copy button works, the teaser loads, no violations in the console; an
+injected `<script>` and an `onerror=` handler are both blocked. A test recomputes the hash from the page.
+
+Docs: SECURITY, the README (both) and the CHANGELOG say so.
+
+Tests: 66 (were 65). ruff, mypy clean.
+
+Next: round 5 (a second independent review), then v0.1.0.

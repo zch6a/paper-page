@@ -66,7 +66,7 @@ paper-page render page/
 
 paper-page 只访问 arXiv（元数据走 `export.arxiv.org`，源码走 `arxiv.org/e-print`），按 arXiv 的要求每三秒最多一次请求，User-Agent 只写工具名。
 源码只在内存里读取，从不解压到磁盘：只写出选中的图片，文件名由工具生成（`figures/fig-1.png`）。PDF 图通过运行 `pdftoppm` 转换（不经过 shell，有时间限制，临时文件夹用完即删）。生成的页面不从任何别的地方加载资源；
-所有文字都经过转义，链接只允许 http(s)。详见 [SECURITY.md](SECURITY.md)。
+所有文字都经过转义，链接只允许 http(s)，页面的内容安全策略（CSP）只允许它自己的复制按钮脚本运行。详见 [SECURITY.md](SECURITY.md)。
 
 ## 许可证
 

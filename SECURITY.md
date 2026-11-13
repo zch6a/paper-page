@@ -18,7 +18,10 @@
   The PDF is the paper's own figure from arXiv; `pdftoppm` is your installed copy, as up to date as you keep it.
 - **The page is inert to the data.** Every text from arXiv or `page.json` is HTML-escaped; a link is written only when
   it is `http(s)`, a figure only when it is a path inside the page's folder or an `https` URL (percent-encoded dots
-  and control characters refused); anything else is left out and reported. Files are written whole or not at all. The page loads no fonts, scripts or styles from elsewhere; its one script copies the BibTeX.
+  and control characters refused); anything else is left out and reported. Files are written whole or not at all.
+  The page loads no fonts, scripts or styles from elsewhere; its one script copies the BibTeX.
+- **And if escaping ever failed**, the page's Content-Security-Policy still lets the browser run only that script
+  (allowed by its hash: no injected `<script>`, no `onerror=`), load nothing but images, and send no form.
 - **Your edits are kept.** `new` refuses to overwrite an existing `page.json` without `--force`.
 
 ## What it does not protect against

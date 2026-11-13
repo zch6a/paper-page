@@ -11,4 +11,4 @@ First release.
 - `paper-page new --tex main.tex`: the same from a TeX project, before the paper is on arXiv.
 - `paper-page render`: the HTML again after editing `page.json`.
 - The page: one self-contained file, light and dark, phone-friendly; Google Scholar's `citation_*` tags and Open
-  Graph tags; a copy button for the BibTeX.
+  Graph tags; a copy button for the BibTeX; a Content-Security-Policy that lets only that button's script run.
