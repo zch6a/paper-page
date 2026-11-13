@@ -148,7 +148,7 @@ def read_source(blob: bytes) -> dict[str, bytes]:
     except tarfile.TarError:
         pass
     text = data[:MAX_FILE]
-    if b"\\documentclass" in text or b"\\begin{document}" in text:
+    if re.search(rb"\\document(?:class|style)|\\begin\{document\}", text):  # \documentstyle: LaTeX 2.09, still on arXiv
         return {"main.tex": text}  # one gzipped TeX file
     return {}
 
@@ -186,7 +186,9 @@ def main_file(files: dict[str, bytes]) -> str | None:
     """The main TeX file: one with \\documentclass and \\begin{document} (of several, ms.tex/main.tex/paper.tex first,
     then the largest)."""
     mains = [
-        n for n, b in files.items() if n.lower().endswith(".tex") and re.search(rb"(?m)^[^%\n]*\\documentclass", b) and b"\\begin{document}" in b
+        n
+        for n, b in files.items()
+        if n.lower().endswith(".tex") and re.search(rb"(?m)^[^%\n]*\\document(?:class|style)", b) and b"\\begin{document}" in b
     ]
     if not mains:
         return None

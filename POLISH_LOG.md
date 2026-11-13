@@ -127,3 +127,28 @@ without `--force`. The workflows were found sound.
 Tests: 60 (were 38). ruff, mypy clean.
 
 Next: round 3.
+
+### 2026-11-13 — polishing round 3
+
+**Edge cases on real papers**: old-style IDs (hep-th/9711200, math/0211159), a version (1312.6114v11), a PDF link
+(https://arxiv.org/pdf/1412.6980v9), an unknown ID (2401.99999: one line, exit 2).
+
+1. hep-th/9711200 said "arXiv has no TeX source": its source is one gzipped file in LaTeX 2.09 (`\documentstyle`),
+   which neither the single-file check nor the main-file search knew. Both do now.
+2. Adam took no figures and said nothing: its source is a 298-byte stub wrapping the compiled PDF. The report now says
+   the source has no figures paper-page can read.
+
+**A live example**: `.github/workflows/pages.yml` publishes the made-up example at https://zch6a.github.io/paper-page/
+with the README's "Publish it" workflow, step for step (a test keeps its pinned actions the same as the README's), so
+the recipe is run for real. The example's `site_url` is now that address.
+
+3. Its teaser was an SVG, and link previews (social sites, chat apps) do not show SVG images: `render` warns when the
+   preview image would be an SVG, and the example uses a PNG of its figure (rendered with headless Chrome).
+
+**First run**: `paper-page` with no arguments printed argparse's "the following arguments are required: command"; it
+prints the help now. The other error paths (an ID and `--tex` both, a missing file, `--figures -1`, a bad page.json, an
+unsafe link) give one clear line each. No dead code found.
+
+Tests: 65 (were 60). ruff, mypy clean.
+
+Next: round 4 (security and release configuration again, a fresh install, the README's first screen).

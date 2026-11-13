@@ -18,7 +18,7 @@ One static HTML file, light and dark, readable on a phone, ready for GitHub Page
 ---
 
 <p align="center"><img src="docs/example-light.png" width="760" alt="The example page: venue, title, authors with affiliations, buttons for arXiv, PDF, Code, Video and Data, a teaser figure, the abstract and the citation"></p>
-<p align="center"><sub>The <a href="examples/tiny-fields">example</a>, a made-up paper. Its <a href="docs/example-dark.png">dark version</a>.</sub></p>
+<p align="center"><sub>The <a href="examples/tiny-fields">example</a>, a made-up paper, <b><a href="https://zch6a.github.io/paper-page/">live on GitHub Pages</a></b> (published by the workflow below). Its <a href="docs/example-dark.png">dark version</a>.</sub></p>
 
 The usual way to make a project page is to copy a template repository and fill in every name, link and figure by
 hand, and the best-known template is no longer maintained. Everything a project page starts from is already on arXiv:

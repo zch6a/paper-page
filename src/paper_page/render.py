@@ -114,6 +114,8 @@ def render(page: Page) -> tuple[str, list[str]]:
     base = site if site.endswith("/") or not site else site + "/"
     teaser_src = safe_src(page.teaser.src) if page.teaser else ""
     og_image = teaser_src if teaser_src.startswith("https://") else (base + teaser_src if base and teaser_src else "")
+    if og_image.lower().endswith(".svg"):
+        warnings.append("the teaser is an SVG: link previews (social sites, chat apps) do not show SVG images; a PNG or JPEG of it shows")
     description = page.abstract[:297] + "…" if len(page.abstract) > 300 else page.abstract
 
     meta = [f'<meta name="description" content="{e(description)}">', f'<meta name="citation_title" content="{e(page.title)}">']

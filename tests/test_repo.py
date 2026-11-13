@@ -25,3 +25,10 @@ def test_the_readme_options_are_the_cli_options() -> None:
     help_text = cli.__doc__ or ""
     assert documented == {"-o", "--figures", "--tex", "--no-convert", "--force"}
     assert "paper-page render" in help_text and "paper-page new" in help_text
+
+
+def test_the_pages_workflow_uses_the_readme_recipe() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    workflow = (ROOT / ".github" / "workflows" / "pages.yml").read_text(encoding="utf-8")
+    pins = re.compile(r"uses: (actions/[a-z-]+@[0-9a-f]{40})")
+    assert pins.findall(workflow) == pins.findall(readme.split("# .github/workflows/page.yml", 1)[1]) != []

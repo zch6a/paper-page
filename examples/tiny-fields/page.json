@@ -18,7 +18,7 @@
     {"label": "Data", "url": "https://example.org/tiny-fields/data"}
   ],
   "teaser": {
-    "src": "figures/teaser.svg",
+    "src": "figures/teaser.png",
     "caption": "Tiny Fields fits a small field of α-blended points to a few input views, then renders a new view in real time.",
     "alt": "Two input views of a scene, a small field of points, and a rendered new view."
   },
@@ -26,6 +26,6 @@
   "bibtex": "@misc{example2024tiny,\n  title         = {{Tiny Fields: Learning α-Blended Scenes in O(n²) Time}},\n  author        = {Example, Ada and Sample, Bo and Test, Cy},\n  year          = {2024},\n  note          = {An Example Conference 2024 (oral)},\n  eprint        = {2401.01234},\n  archivePrefix = {arXiv},\n  primaryClass  = {cs.CV},\n  url           = {https://arxiv.org/abs/2401.01234},\n}",
   "doi": "",
   "categories": ["cs.CV"],
-  "site_url": "https://example.org/tiny-fields/",
+  "site_url": "https://zch6a.github.io/paper-page/",
   "accent": "#2f6fdf"
 }

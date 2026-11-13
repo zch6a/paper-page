@@ -46,6 +46,9 @@ def main(argv: list[str] | None = None) -> int:
     n.add_argument("--force", action="store_true", help="replace an existing page.json (your edits in it are lost)")
     r = sub.add_parser("render", help="make index.html again from the folder's page.json")
     r.add_argument("folder", type=Path, nargs="?", default=Path("page"), help="the page's folder (default page/)")
+    if not (sys.argv[1:] if argv is None else argv):  # a first run with nothing: the help, not an error about a missing word
+        ap.print_help()
+        return 2
     args = ap.parse_args(argv)
     try:
         if args.command == "new":
@@ -117,6 +120,8 @@ def _new(args: argparse.Namespace) -> int:
     for s in figs.skipped:
         if s != figs.teaser_skipped:
             print(f"  figure not in a web format, skipped: {s} (convert it to PNG and add it to page.json)")
+    if files and args.figures and not figs.images and not figs.skipped:
+        print("  (the source has no figures paper-page can read: none in figure environments, or the paper is a PDF wrapped in TeX)")
     if convert is None and not args.no_convert and any(s.lower().endswith(".pdf") for s in figs.skipped):
         print("  (with poppler's pdftoppm installed, PDF figures are converted for you; MiKTeX includes it)")
     for w in warnings:

@@ -315,3 +315,13 @@ def test_a_tex_project_keeps_the_links_its_abstract_names() -> None:
         "p.tex": rb"""\documentclass{article}\title{T}\begin{document}\begin{abstract}Code: \url{https://github.com/a/b}.\end{abstract}\end{document}"""
     }
     assert [(x.label, x.url) for x in from_tex(files).links] == [("Code", "https://github.com/a/b")]
+
+
+def test_an_svg_teaser_with_a_site_url_warns_about_link_previews() -> None:
+    p = page()
+    p.site_url, p.teaser = "https://ada.example/tiny/", Figure("figures/teaser.svg", "T.")
+    assert any("SVG" in w for w in render(p)[1])
+
+
+def test_no_arguments_prints_the_help(capsys: pytest.CaptureFixture[str]) -> None:
+    assert cli.main([]) == 2 and "paper-page new 2003.08934" in capsys.readouterr().out

@@ -17,7 +17,7 @@ Google Scholar 收录用的 meta 标签和链接预览用的 Open Graph 标签�
 ---
 
 <p align="center"><img src="docs/example-light.png" width="760" alt="示例页面：会议、标题、作者与单位、arXiv/PDF/Code/Video/Data 按钮、预览图、摘要与引用"></p>
-<p align="center"><sub><a href="examples/tiny-fields">示例</a>是一篇虚构的论文。另见<a href="docs/example-dark.png">深色版</a>。</sub></p>
+<p align="center"><sub><a href="examples/tiny-fields">示例</a>是一篇虚构的论文，<b><a href="https://zch6a.github.io/paper-page/">已发布在 GitHub Pages 上</a></b>（用的就是下面的发布工作流）。另见<a href="docs/example-dark.png">深色版</a>。</sub></p>
 
 做项目主页通常要复制一个模板仓库，把每个名字、链接、图片手工填进去，而最有名的那个模板已经不再维护。项目主页需要的东西 arXiv 上都有：
 paper-page 读出来直接生成页面，剩下的写在一个可以编辑的 JSON 文件里。

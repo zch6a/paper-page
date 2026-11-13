@@ -17,7 +17,7 @@ from paper_page.arxiv import Client
 from paper_page.make import bibtex, from_tex, venue_of
 from paper_page.model import Author, Page
 from paper_page.render import safe_src
-from paper_page.tex import MAX_TOTAL, SourceTooLarge, expand, figures, read_source, to_text, use_macros
+from paper_page.tex import MAX_TOTAL, SourceTooLarge, expand, figures, main_file, read_source, to_text, use_macros
 
 
 def test_a_gzip_bomb_is_refused_without_inflating_it() -> None:
@@ -134,3 +134,16 @@ def test_plain_tar_sources_are_still_read() -> None:
         info.size = 3
         tar.addfile(info, io.BytesIO(b"abc"))
     assert read_source(buf.getvalue()) == {"main.tex": b"abc"}
+
+
+def test_latex_209_sources_are_read() -> None:
+    old = gzip.compress(rb"\documentstyle[12pt]{article}\begin{document}\title{Old}\end{document}")
+    assert list(read_source(old)) == ["main.tex"] and main_file(read_source(old)) == "main.tex"
+
+
+def test_a_source_without_figures_says_so(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    fake = FakeArxiv(src=gzip.compress(rb"\documentclass{article}\begin{document}\includepdf{paper.pdf}\end{document}"))
+    monkeypatch.setattr(cli, "Client", lambda: Client(get=fake, sleep=lambda _: None))
+    monkeypatch.setattr(cli, "find_converter", lambda: None)
+    assert cli.main(["new", "2401.01234", "-o", str(tmp_path / "p")]) == 0
+    assert "the source has no figures paper-page can read" in capsys.readouterr().out
