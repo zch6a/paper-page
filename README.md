@@ -121,6 +121,12 @@ copy-button script run. See [SECURITY.md](SECURITY.md).
 [scholar-cards](https://github.com/zch6a/scholar-cards) puts your citations on your homepage ·
 [paper-impact](https://github.com/zch6a/paper-impact) shows which papers at AI venues mattered.
 
+## Part of research-kit
+
+One of thirteen open research tools, from reading papers to after publication. All of them, in the order of
+the work, with one Claude Code plugin marketplace for their skills: [research-kit](https://github.com/zch6a/research-kit)
+· [site](https://zch6a.github.io/research-kit/).
+
 ## License
 
 MIT. The pages it makes are yours; the figures in them are the paper's.

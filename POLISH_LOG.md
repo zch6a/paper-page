@@ -216,3 +216,8 @@ showed this one's SKILL.md frontmatter did not parse: a plain YAML value with `:
 starts a new key, so Claude Code loaded the skill with no description, and an agent would never pick it. The
 description and compatibility values are quoted (a JSON string is a YAML double-quoted scalar); validation passes.
 Released as 0.1.1 so that `v0`, which the marketplace installs from, carries the fix.
+
+### 2026-11-14 — a link to research-kit
+
+Both READMEs now end (before the licence) with a short section pointing to research-kit, the toolkit's front door: all
+thirteen tools in the order of the work, and one Claude Code plugin marketplace for their skills. Documentation only.
