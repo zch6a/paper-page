@@ -171,3 +171,40 @@ Docs: SECURITY, the README (both) and the CHANGELOG say so.
 Tests: 66 (were 65). ruff, mypy clean.
 
 Next: round 5 (a second independent review), then v0.1.0.
+
+### 2026-11-13 — polishing round 5
+
+**Second independent review** (15: 14 confirmed, 1 plausible, all fixed; tests in `tests/test_review_round2.py`):
+
+1. A failed source download (a 404 for the e-print link, the size cap, the network) stopped the whole command after the
+   metadata had arrived, and no page was written: the figures are optional, so the page is made without them.
+2. `\$10` lost its dollar sign, `\textasciitilde` became a space, `\{x, y\}` lost its braces: escaped characters are
+   set aside before the steps that drop `$` and braces (and read `_` as a subscript), and restored at the end.
+3. `Input\\Output` dropped "Output" (the second backslash was read as a command): line breaks are handled first.
+4. A figure of subfigures took panel (a)'s caption: the figure's own caption (its last `\caption` outside subfigures)
+   now. One image is still shown (the first panel), as the README now says.
+5. When the first figure's image was missing from the source (`teaser.tif`, or `teaser.PNG` in capitals), a later
+   figure became the teaser silently: the teaser is the paper's first figure, found or not, with a message; extensions
+   match in any case.
+6. Words before a link overrode an obvious host ("Code and data are available at github.com/..." → Data): GitHub,
+   YouTube, Hugging Face datasets, Zenodo label themselves; the words label the rest.
+7. `--tex` ignored the paper's macros in the title and abstract (`\ours: Fast Fields` → ": Fast Fields") and failed on
+   ICML (`\icmltitle`, `\icmlauthor`): both handled.
+8. A `\thanks` with nested braces leaked into the title ("Tiny FieldsFunded by X"): commands are dropped with their
+   arguments, braces balanced (also in author blocks).
+9. A `\captionof{figure}` with no image of its own (a TikZ teaser) took an earlier figure's image: only images after the
+   last figure count.
+10. The `\captionof` check was quadratic (8,000 of each: 3.5 s): a binary search over the figure spans.
+11. `$90^\circ$` → "90^": degrees are °.
+12. "the .ply format" lost the space before the dot: a space goes before a full stop only when the stop ends a word.
+13. A too-large source printed two contradictory messages: one.
+14. The hint for an EPS teaser suggested pdftoppm, which does not read EPS: it says so.
+15. (plausible) Extensions were tried web images first, unlike pdfLaTeX (PDF first): when a figure is both `x.pdf` and
+    a preview `x.png`, the PDF the paper prints is taken (converted), the PNG standing in when it cannot be.
+
+Rechecked on four real papers: all teasers right; Segment Anything's is now its true Figure 1 (a panel caption had
+picked another).
+
+Tests: 80 (were 66). ruff, mypy clean.
+
+Next: release v0.1.0.

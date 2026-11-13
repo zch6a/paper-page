@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from .arxiv import ARXIV, ATOM
 from .convert import Converter
 from .model import Author, Figure, Link, Page
-from .tex import WEB_IMAGES, all_args, command_arg, expand, figures, find_image, graphicspath, macros, main_file, to_text, use_macros
+from .tex import WEB_IMAGES, all_args, command_arg, drop_commands, expand, figures, find_images, graphicspath, macros, main_file, to_text, use_macros
 
 URL = re.compile(r"https?://[^\s<>\"'{}\\]+")
 
@@ -68,6 +68,8 @@ def found_links(text: str) -> list[Link]:
     [('Code', 'https://github.com/a/b'), ('Video', 'https://youtu.be/x'), ('Project page', 'http://tancik.com/nerf')]
     >>> [(x.label, x.url) for x in found_links("Our code is released at https://lab.example.org/tiny and data at https://example.org/d")]
     [('Code', 'https://lab.example.org/tiny'), ('Data', 'https://example.org/d')]
+    >>> [x.label for x in found_links("Code and data are available at https://github.com/a/b")]
+    ['Code']
     """
     out: list[Link] = []
     seen: set[str] = set()
@@ -79,7 +81,10 @@ def found_links(text: str) -> list[Link]:
         if host.endswith("arxiv.org") or url in seen:
             continue
         said = _said(re.split(r"[.;!?](?:\s|$)", text[max(0, m.start() - 60) : m.start()])[-1])  # within its own sentence
-        if said:
+        by_host = _by_host(host, url)
+        if by_host:
+            label = by_host  # github.com is code whatever the sentence says ("code and data are at ...")
+        elif said:
             label = said
         elif host in ("github.com", "gitlab.com", "bitbucket.org", "codeberg.org"):
             label = "Code"
@@ -96,6 +101,19 @@ def found_links(text: str) -> list[Link]:
         seen.add(url)
         out.append(Link(label, url))
     return out
+
+
+def _by_host(host: str, url: str) -> str:
+    """The kind of link a host says plainly, or ""."""
+    if host in ("github.com", "gitlab.com", "bitbucket.org", "codeberg.org"):
+        return "Code"
+    if host in ("youtube.com", "youtu.be", "vimeo.com", "m.youtube.com"):
+        return "Video"
+    if host == "huggingface.co" and "/datasets/" in url:
+        return "Data"
+    if host.endswith(("zenodo.org", "kaggle.com")):
+        return "Data"
+    return ""
 
 
 SAID = {"code": "Code", "implementation": "Code", "source": "Code", "video": "Video", "videos": "Video", "data": "Data",
@@ -242,6 +260,7 @@ class Figures:
     skipped: list[str] = field(default_factory=list)  # figures not in a web format (PDF, EPS): to convert by hand
     teaser_skipped: str = ""  # the paper's first figure, when it is one of those: the page then has no teaser
     converted: list[str] = field(default_factory=list)  # PDF figures converted to PNG
+    missing: list[str] = field(default_factory=list)  # images a figure includes that are not in the source (a .tif, say)
 
 
 def take_figures(files: dict[str, bytes], limit: int, main: str | None = None, convert: Converter | None = None) -> Figures:
@@ -257,25 +276,17 @@ def take_figures(files: dict[str, bytes], limit: int, main: str | None = None, c
     gp = graphicspath(tex)
     own = macros(tex)
     n = 0
-    for i, f in enumerate(x for x in figures(tex) if find_image(x.image, files, main, gp)):
+    for i, f in enumerate(figures(tex)):  # i counts every figure: the teaser is the first, found or not
         if n >= limit:
             break
-        found = find_image(f.image, files, main, gp) or ""
-        ext = posixpath.splitext(found)[1].lower()
-        data: bytes | None = files[found]
-        if ext == ".pdf" and convert is not None:
-            data = convert(files[found])
-            kind = (
-                ".png"
-                if data is not None and data[:8] == b"\x89PNG\r\n\x1a\n"
-                else ".jpg"
-                if data is not None and data[:3] == b"\xff\xd8\xff"
-                else ""
-            )
-            if kind:
-                ext = kind
-                out.converted.append(found)
-        if ext not in WEB_IMAGES or data is None:
+        candidates = find_images(f.image, files, main, gp)
+        if not candidates:
+            out.missing.append(f.image)
+            if i == 0:
+                out.teaser_skipped = f.image
+            continue
+        found, data, ext = _usable(candidates, files, convert, out)
+        if data is None:
             out.skipped.append(found)
             if i == 0:
                 out.teaser_skipped = found
@@ -292,6 +303,24 @@ def take_figures(files: dict[str, bytes], limit: int, main: str | None = None, c
     return out
 
 
+def _usable(candidates: list[str], files: dict[str, bytes], convert: Converter | None, out: Figures) -> tuple[str, bytes | None, str]:
+    """The first candidate a browser can show: a web image as it is, a PDF converted; (the first candidate, None, "")
+    when there is none."""
+    for found in candidates:
+        ext = posixpath.splitext(found)[1].lower()
+        if ext in WEB_IMAGES:
+            return found, files[found], ext
+        if ext == ".pdf" and convert is not None:
+            data = convert(files[found])
+            if data is not None and data[:8] == b"\x89PNG\r\n\x1a\n":
+                out.converted.append(found)
+                return found, data, ".png"
+            if data is not None and data[:3] == b"\xff\xd8\xff":
+                out.converted.append(found)
+                return found, data, ".jpg"
+    return candidates[0], None, ""
+
+
 def from_tex(files: dict[str, bytes], main: str | None = None) -> Page:
     r"""A page from a TeX project (a paper not on arXiv yet): \title, \author (names split at \and, commas and line
     breaks; \thanks and footnote marks dropped), the abstract."""
@@ -299,17 +328,26 @@ def from_tex(files: dict[str, bytes], main: str | None = None) -> Page:
     if main is None:
         raise ValueError("no main TeX file (one with \\documentclass and \\begin{document})")
     tex = expand(main, files)
-    title = to_text(re.sub(r"\\(?:thanks|footnote)\{[^{}]*\}", "", command_arg(tex, "title") or "").replace("\\\\", " "))
+    own = macros(tex)
+    raw_title = command_arg(tex, "title") or command_arg(tex, "icmltitle") or ""  # ICML has its own command
+    title = to_text(use_macros(drop_commands(raw_title, ("thanks", "footnote")), own))
     if not title:
         raise ValueError(f"{main}: no \\title")
+    icml = all_args(tex, "icmlauthor")
     blocks = all_args(tex, "author")
-    # acmart and others give each author an \author of their own: the first name of each; else one block of all
-    names = [n for b in blocks for n in author_names(b)[:1]] if len(blocks) > 1 else author_names(blocks[0] if blocks else "")
-    authors = [Author(n) for n in names]
+    if icml:  # \icmlauthor{Name}{affiliation key}: one per author
+        names = [to_text(use_macros(n, own)) for n in icml]
+    else:  # acmart and others give each author an \author of their own: the first name of each; else one block of all
+        names = (
+            [n for b in blocks for n in author_names(use_macros(b, own))[:1]]
+            if len(blocks) > 1
+            else author_names(use_macros(blocks[0] if blocks else "", own))
+        )
+    authors = [Author(n) for n in names if n]
     abstract = ""
     m = re.search(r"\\begin\{abstract\}(.*?)\\end\{abstract\}", tex, flags=re.S)
     if m:
-        abstract = to_text(m.group(1))
+        abstract = to_text(use_macros(m.group(1), own))
     page = Page(title=title, authors=authors, abstract=abstract, links=found_links(m.group(1)) if m else [])
     page.bibtex = bibtex(page)
     return page
@@ -325,8 +363,8 @@ def author_names(block: str) -> list[str]:
     >>> author_names(r"Ada Example\inst{1} \and Bo Sample\inst{2}")
     ['Ada Example', 'Bo Sample']
     """
-    block = re.sub(
-        r"\\(?:thanks|footnote|footnotemark|affiliation|email|orcid|orcidlink|inst|IEEEauthorrefmark|affil)\s*(?:\[[^\]]*\])?\{[^{}]*\}", "", block
+    block = drop_commands(
+        block, ("thanks", "footnote", "footnotemark", "affiliation", "email", "orcid", "orcidlink", "inst", "IEEEauthorrefmark", "affil")
     )
     block = re.sub(r"\$[^$]*\$|\\textsuperscript\{[^{}]*\}|\\footnotemark(\[[^\]]*\])?", "", block)
     parts = re.split(r"\\and\b", block, flags=re.I)  # \and, \And (NeurIPS), \AND

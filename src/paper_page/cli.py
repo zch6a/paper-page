@@ -80,12 +80,12 @@ def _new(args: argparse.Namespace) -> int:
         files, main_name = {}, None
         if args.figures:
             print(f"paper-page: fetching arXiv:{arxiv_id}{page.version}'s source for its figures (--figures 0 skips this)", file=sys.stderr)
-            kind, blob = client.source(arxiv_id, version)
             try:
+                kind, blob = client.source(arxiv_id, version)
                 files = read_source(blob)
-            except SourceTooLarge as e:
+            except (ArxivError, SourceTooLarge) as e:  # the figures are optional: the page is made without them
                 print(f"paper-page: {e}: no figures taken", file=sys.stderr)
-                files = {}
+                kind, blob = "", b""
             if not files and blob:
                 print(f"paper-page: arXiv has no TeX source for {arxiv_id} ({kind or 'unknown type'}): no figures taken", file=sys.stderr)
         source_note = f"from arXiv:{arxiv_id}{page.version}"
@@ -114,13 +114,22 @@ def _new(args: argparse.Namespace) -> int:
     print(f"  figures: {len(figs.images)} taken{converted}" + (f" (teaser: {page.teaser.src})" if page.teaser else ""))
     if figs.teaser_skipped:
         name = figs.teaser_skipped.rsplit("/", 1)[-1]
-        why = "could not be converted" if convert is not None and name.lower().endswith(".pdf") else "is not in a web format"
-        print(f"  the teaser ({figs.teaser_skipped}) {why}: no teaser on the page; convert it to PNG (e.g. "
-              f"`pdftoppm -png -r 200 -singlefile {name} teaser`), put it in {out.as_posix()}/figures/ and set teaser.src in page.json")  # fmt: skip
+        if figs.teaser_skipped in figs.missing:
+            why, how = "is not in the source (or not in a format arXiv keeps)", "a PNG of it"
+        elif name.lower().endswith(".pdf"):
+            why = "could not be converted" if convert is not None else "is a PDF"
+            how = f"a PNG of it (e.g. `pdftoppm -png -r 200 -singlefile {name} teaser`)"
+        else:
+            why, how = "is not in a web format", "a PNG of it (pdftoppm does not read EPS: Ghostscript or an image editor does)"
+        print(f"  the teaser ({figs.teaser_skipped}) {why}: no teaser on the page; put {how} in {out.as_posix()}/figures/ "
+              "and set teaser.src in page.json")  # fmt: skip
     for s in figs.skipped:
         if s != figs.teaser_skipped:
             print(f"  figure not in a web format, skipped: {s} (convert it to PNG and add it to page.json)")
-    if files and args.figures and not figs.images and not figs.skipped:
+    for s in figs.missing:
+        if s != figs.teaser_skipped:
+            print(f"  figure image not in the source, skipped: {s}")
+    if files and args.figures and not figs.images and not figs.skipped and not figs.missing:
         print("  (the source has no figures paper-page can read: none in figure environments, or the paper is a PDF wrapped in TeX)")
     if convert is None and not args.no_convert and any(s.lower().endswith(".pdf") for s in figs.skipped):
         print("  (with poppler's pdftoppm installed, PDF figures are converted for you; MiKTeX includes it)")

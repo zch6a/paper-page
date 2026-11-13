@@ -31,7 +31,7 @@ uvx --from git+https://github.com/zch6a/paper-page paper-page new 2003.08934 -o 
 - **标题、作者、摘要**，简单的 TeX 公式转成文字（`$O(n^2)$` → O(n²)，`\alpha` → α）；arXiv 有单位信息时一并取出。
 - **会议**：只有 arXiv 的 comment 明确写出时才填（“ECCV 2020 (oral)”“Accepted to ICLR 2024”），从不猜。
 - **链接**：arXiv、PDF、DOI，以及摘要和 comment 里出现的代码、视频、数据、项目主页链接，按链接前面的词（“our code is at ...”）或网址（GitHub → Code，YouTube → Video）命名。
-- **图**：从论文源码里取，第一张图作预览图，后面的依次排列，各带图注（论文自定义的简单宏会展开，引用标记去掉）。PNG、JPEG、GIF、WebP、SVG 原样复制；
+- **图**：从论文源码里取，第一张图作预览图，后面的依次排列，各带图注（论文自定义的简单宏会展开，引用标记去掉；由多个子图组成的图显示第一个子图和整张图自己的图注；同名的 PDF 与 PNG 都有时取论文实际印出的 PDF）。PNG、JPEG、GIF、WebP、SVG 原样复制；
   装有 poppler 的 `pdftoppm` 时（MiKTeX 自带）**PDF 图会自动转换**（第一页，宽 1600 像素；照片多的图在更小时存成 JPEG），没有则列出来请你转换。
   第一张图无法显示时页面就不放预览图，不会拿后面的图顶替。
 - **BibTeX**：arXiv 的字段（eprint、archivePrefix、primaryClass），标题大小写加花括号保护。

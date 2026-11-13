@@ -4,6 +4,7 @@ file with its \input files, and its figures (the image each includes, and its ca
 
 from __future__ import annotations
 
+import bisect
 import io
 import posixpath
 import re
@@ -45,18 +46,33 @@ def to_text(s: str) -> str:
     'Generated samples at log p(x), done'
     >>> to_text(r"Mart\'{\i}nez, Bj\o rn, Stra\ss e, \AA ngstr\"om, \LaTeX{} at http://cs.example.edu/~ada/model_2")
     'Martínez, Bjørn, Straße, Ångström, LaTeX at http://cs.example.edu/~ada/model_2'
+    >>> to_text(r"less than \$10, a\textasciitilde b, the set \{x, y\}, x\_1, Input\\Output, $90^\circ$, the .ply format")
+    'less than $10, a~b, the set {x, y}, x_1, Input Output, 90°, the .ply format'
     """
     parts = URL_TEXT.split(s)  # a URL is kept as it is: its ~ and _ are not TeX
     urls = URL_TEXT.findall(s)
-    return (
-        "".join(_text(p) + (" " + u + " " if i < len(urls) else "") for i, (p, u) in enumerate(zip(parts, [*urls, ""], strict=True)))
-        .strip()
-        .replace(" ,", ",")
-        .replace(" .", ".")
-    )
+    joined = "".join(_text(p) + (" " + u + " " if i < len(urls) else "") for i, (p, u) in enumerate(zip(parts, [*urls, ""], strict=True)))
+    return _tidy(joined)
+
+
+def _tidy(s: str) -> str:
+    r"""Spaces as a sentence has them: one at a time, none before a comma or a full stop (a removed \cite leaves one),
+    but kept before ".ply" or ".NET"."""
+    return re.sub(r"\s+([,;:!?)]|\.(?=\s|$))", r"\1", " ".join(s.split()))
+
+
+ESCAPED = {"\\$": "\x01D", "\\{": "\x01L", "\\}": "\x01R", "\\%": "\x01P", "\\&": "\x01A", "\\_": "\x01U", "\\#": "\x01H"}
+RESTORE = {"\x01D": "$", "\x01L": "{", "\x01R": "}", "\x01P": "%", "\x01A": "&", "\x01U": "_", "\x01H": "#", "\x01T": "~"}
 
 
 def _text(s: str) -> str:
+    # escaped characters are set aside first, so that later steps (which drop $ and braces, read _ as a subscript)
+    # cannot touch them; restored at the end
+    s = s.replace("\x01", "")
+    s = re.sub(r"\\textasciitilde\b\s*(?:\{\})?", "\x01T", s)
+    s = re.sub(r"\\[$%&_#{}]", lambda m: ESCAPED[m.group(0)], s)
+    s = re.sub(r"\\\\(?:\[[^\]]*\])?|\\newline\b", " ", s)  # a line break, before \\Output can be read as a command
+    s = re.sub(r"\^\s*\{?\\circ\}?|\\degree\b", "°", s)  # 90^\circ
     s = re.sub(r"\\([`'\"^~=])\s*\{?\\([ij])\}?(?![A-Za-z])", lambda m: m.group(2) + ACCENTS[m.group(1)], s)  # \'{\i}: í
     # references and revision marks go with their arguments: \cite{key} must not leave "key" in the text
     s = re.sub(r"~?\\(?:cite[a-z]*|nocite|ref|eqref|autoref|cref|Cref|pageref|label|sout|st|xout)\*?\s*(?:\[[^\]]*\]\s*)*\{[^{}]*\}", "", s)
@@ -74,13 +90,12 @@ def _text(s: str) -> str:
     s = re.sub(r"_([0-9])", lambda m: _script(m.group(1), SUB, "_"), s)
     # what is left: math operators as their names, other commands (\small, \centering, \bf) dropped
     s = re.sub(r"\\([A-Za-z]+)( ?)", _command, s)
-    s = re.sub(r"\\([%&_#${}])", lambda m: SYMBOLS[m.group(1)], s)
-    s = s.replace("``", "“").replace("''", "”").replace("---", "—").replace("--", "–").replace("~", " ").replace("\\\\", " ")
-    s = re.sub(r"(?<!\\)\$", "", s)
+    s = s.replace("``", "“").replace("''", "”").replace("---", "—").replace("--", "–").replace("~", " ")
+    s = s.replace("$", "")
     s = re.sub(r"\\[,;:! ]", " ", s)
     s = s.replace("{", "").replace("}", "")
-    s = re.sub(r"\s+([,.;:!?)])", r"\1", " ".join(s.split()))  # "quality \cite{x}, while": no space before the comma
-    return unicodedata.normalize("NFC", s)  # o + a combining diaeresis as one letter
+    s = re.sub("\x01[A-Z]", lambda m: RESTORE[m.group(0)], s)
+    return unicodedata.normalize("NFC", _tidy(s))  # o + a combining diaeresis as one letter
 
 
 OPERATORS = {"log", "exp", "ln", "max", "min", "arg", "sin", "cos", "tan", "lim", "sup", "inf", "det", "dim", "argmax", "argmin"}
@@ -259,6 +274,25 @@ def command_arg(tex: str, command: str) -> str | None:
     return braced(tex, m.end() - 1)[0]
 
 
+def drop_commands(tex: str, names: tuple[str, ...]) -> str:
+    r"""The text without these commands and their arguments, braces balanced (\thanks{Funded by \emph{X}} goes whole).
+
+    >>> drop_commands(r"Tiny Fields\thanks{Funded by \emph{X}} \inst{1}", ("thanks", "inst"))
+    'Tiny Fields '
+    """
+    pattern = re.compile(r"\\(?:" + "|".join(map(re.escape, names)) + r")(?![A-Za-z])\*?\s*(?:\[[^\]]*\]\s*)?")
+    out, i = [], 0
+    for m in pattern.finditer(tex):
+        if m.start() < i:
+            continue
+        out.append(tex[i : m.start()])
+        i = m.end()
+        if i < len(tex) and tex[i] == "{":
+            i = braced(tex, i)[1]
+    out.append(tex[i:])
+    return "".join(out)
+
+
 def all_args(tex: str, command: str) -> list[str]:
     r"""The first argument of every \command, in order.
 
@@ -302,11 +336,14 @@ def figures(tex: str) -> list[TexFigure]:
         body = tex[o.end() : t.start()]
         g = GRAPHICS.search(body)
         if g:
-            found.append((o.start(), TexFigure(g.group(1).strip(), command_arg(body, "caption") or "")))
+            found.append((o.start(), TexFigure(g.group(1).strip(), _own_caption(body))))
+    starts = [a for a, _ in spans]
     for m in re.finditer(r"\\captionof\s*\{figure\}\s*(?:\[[^\]]*\]\s*)?\{", tex):
-        if any(a <= m.start() < b for a, b in spans):
-            continue
-        before = list(GRAPHICS.finditer(tex, max(0, m.start() - 2000), m.start()))
+        k = bisect.bisect_right(starts, m.start()) - 1  # the last figure starting before it (spans do not overlap)
+        if k >= 0 and m.start() < spans[k][1]:
+            continue  # inside a figure: that figure counts
+        since = max(m.start() - 2000, spans[k][1] if k >= 0 else 0)  # never an image of an earlier figure
+        before = list(GRAPHICS.finditer(tex, since, m.start()))
         if before:
             g = before[-1]
             found.append((g.start(), TexFigure(g.group(1).strip(), braced(tex, m.end() - 1)[0])))
@@ -318,6 +355,32 @@ def figures(tex: str) -> list[TexFigure]:
         if g and not any(f.image == g.group(1).strip() for f in out):
             out.insert(0, TexFigure(g.group(1).strip(), command_arg(body, "caption") or ""))
     return out
+
+
+def _own_caption(body: str) -> str:
+    r"""A figure's own caption: its last \caption outside subfigures (the panels' captions come first).
+
+    >>> _own_caption(r"\begin{subfigure}{.5\linewidth}\includegraphics{a}\caption{Input}\end{subfigure}"
+    ...              r"\begin{subfigure}{.5\linewidth}\includegraphics{b}\caption{Output}\end{subfigure}\caption{Our method.}")
+    'Our method.'
+    """
+    inner = [(t.start(), t.group(1)) for t in re.finditer(r"\\(begin|end)\{(?:subfigure|subtable|minipage)\*?\}", body)]
+    depth, outside, last = 0, [], 0
+    for pos, kind in inner:
+        if kind == "begin":
+            if depth == 0:
+                outside.append(body[last:pos])
+            depth += 1
+        elif depth:
+            depth -= 1
+            if depth == 0:
+                last = pos
+    outside.append(body[last:] if depth == 0 else "")
+    text = "".join(outside)
+    hits = list(re.finditer(r"\\caption\*?\s*(?:\[[^\]]*\]\s*)?\{", text))
+    if hits:
+        return braced(text, hits[-1].end() - 1)[0]
+    return command_arg(body, "caption") or ""  # only the panels have captions: the first will do
 
 
 def macros(tex: str) -> dict[str, str]:
@@ -357,17 +420,35 @@ def use_macros(text: str, own: dict[str, str]) -> str:
 WEB_IMAGES = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg")
 
 
-def find_image(path: str, files: dict[str, bytes], main: str, graphicspath: list[str]) -> str | None:
-    """The file an \\includegraphics path names (extensions tried in the order pdfLaTeX does, web images first)."""
+LATEX_ORDER = ["", ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".eps"]  # pdfLaTeX's (its own types first)
+
+
+def find_images(path: str, files: dict[str, bytes], main: str, graphicspath: list[str]) -> list[str]:
+    """The files an \\includegraphics path may name, in the order pdfLaTeX tries extensions (any case: teaser.PNG), the
+    first being the one the paper prints.
+
+    >>> find_images("fig/a", {"fig/a.png": b"", "fig/a.PDF": b"", "x.tex": b""}, "x.tex", [])
+    ['fig/a.PDF', 'fig/a.png']
+    """
+    if not path:
+        return []
+    lower = {n.lower(): n for n in files}
     base = posixpath.dirname(main)
-    dirs = ["", base, *(posixpath.join(base, g) for g in graphicspath), *graphicspath]
-    exts = ["", *WEB_IMAGES, ".pdf", ".eps"]
-    for d in dirs:
-        for ext in exts:
-            c = posixpath.normpath(posixpath.join(d, path + ext)) if path else ""
-            if c in files:
-                return c
-    return None
+    out: list[str] = []
+    for d in dict.fromkeys(["", base, *(posixpath.join(base, g) for g in graphicspath), *graphicspath]):
+        for ext in LATEX_ORDER:
+            c = lower.get(posixpath.normpath(posixpath.join(d, path + ext)).lower())
+            if c is not None and c not in out:
+                out.append(c)
+        if out:
+            return out
+    return out
+
+
+def find_image(path: str, files: dict[str, bytes], main: str, graphicspath: list[str]) -> str | None:
+    """The file an \\includegraphics path names, as pdfLaTeX finds it."""
+    found = find_images(path, files, main, graphicspath)
+    return found[0] if found else None
 
 
 def graphicspath(tex: str) -> list[str]:

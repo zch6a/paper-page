@@ -43,7 +43,8 @@ paper-page: NeRF: Representing Scenes as Neural Radiance Fields for View Synthes
 - **Links**: arXiv, PDF and DOI, plus the code, video, data and project page links found in the abstract and comment,
   labelled by the words before them ("our code is at ...") or where they go (GitHub → Code, YouTube → Video).
 - **Figures** from the paper's source: the first figure is the teaser, the next ones follow, each with its caption
-  (the paper's own simple macros expanded, citations left out). PNG, JPEG, GIF, WebP and SVG are copied as they are;
+  (the paper's own simple macros expanded, citations left out; a figure of several panels shows its first panel with
+  the figure's own caption; when a figure is both a PDF and a PNG, the PDF the paper prints is the one taken). PNG, JPEG, GIF, WebP and SVG are copied as they are;
   **PDF figures are converted** (first page, 1600 pixels wide; a photo-heavy one as JPEG when smaller) when poppler's
   `pdftoppm` is installed, which MiKTeX includes; without it they are listed for you to convert. When the first figure
   cannot be shown, the page has no teaser rather than a later figure in its place.
