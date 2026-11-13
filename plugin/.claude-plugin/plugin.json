@@ -1,7 +1,7 @@
 {
   "name": "paper-page",
   "description": "A project page for a paper from its arXiv ID: title, authors, links, teaser figure, abstract and BibTeX, with Google Scholar and link-preview tags; one static HTML file for GitHub Pages.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": { "name": "zch6a" },
   "homepage": "https://github.com/zch6a/paper-page",
   "repository": "https://github.com/zch6a/paper-page",

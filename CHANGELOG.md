@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1 — 2026-11-14
+
+- The agent skill's frontmatter is valid YAML again: its description held a `: `, which YAML reads as a new key, so
+  the whole frontmatter failed to parse and the skill loaded without its description (`claude plugin validate`
+  reported it). The values are quoted now.
+
 ## 0.1.0 — 2026-11-13
 
 First release.

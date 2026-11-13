@@ -1,6 +1,6 @@
 [project]
 name = "paper-page"
-version = "0.1.0"
+version = "0.1.1"
 description = "A project page for your paper from its arXiv ID: title, authors, links, teaser figure, abstract and BibTeX, with the meta tags Google Scholar and link previews read; one static HTML file for GitHub Pages."
 readme = "README.md"
 license = "MIT"

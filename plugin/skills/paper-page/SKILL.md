@@ -1,8 +1,8 @@
 ---
 name: paper-page
-description: Make a project page for a research paper with paper-page, from its arXiv ID (or a local TeX project before it is on arXiv): title, authors, venue, buttons for arXiv/PDF/code/video/data, the teaser figure, the abstract and a BibTeX block, with Google Scholar citation_* tags and Open Graph tags, as one static HTML file for GitHub Pages. Use when the user wants a project page, paper website or landing page for their paper, or to publish one on GitHub Pages.
+description: "Make a project page for a research paper with paper-page, from its arXiv ID (or a local TeX project before it is on arXiv): title, authors, venue, buttons for arXiv/PDF/code/video/data, the teaser figure, the abstract and a BibTeX block, with Google Scholar citation_* tags and Open Graph tags, as one static HTML file for GitHub Pages. Use when the user wants a project page, paper website or landing page for their paper, or to publish one on GitHub Pages."
 license: MIT
-compatibility: Needs Python 3.10+ and uv. Runs paper-page with uvx from GitHub (git+https://github.com/zch6a/paper-page) unless installed. Reaches only arXiv (export.arxiv.org and arxiv.org/e-print).
+compatibility: "Needs Python 3.10+ and uv. Runs paper-page with uvx from GitHub (git+https://github.com/zch6a/paper-page) unless installed. Reaches only arXiv (export.arxiv.org and arxiv.org/e-print)."
 metadata:
   homepage: https://github.com/zch6a/paper-page
 ---

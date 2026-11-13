@@ -208,3 +208,11 @@ picked another).
 Tests: 80 (were 66). ruff, mypy clean.
 
 Next: release v0.1.0.
+
+### 2026-11-14 — v0.1.1
+
+Putting every tool's skill into one marketplace (research-kit) and running `claude plugin validate` on each
+showed this one's SKILL.md frontmatter did not parse: a plain YAML value with `: ` inside ("…: text size…")
+starts a new key, so Claude Code loaded the skill with no description, and an agent would never pick it. The
+description and compatibility values are quoted (a JSON string is a YAML double-quoted scalar); validation passes.
+Released as 0.1.1 so that `v0`, which the marketplace installs from, carries the fix.
