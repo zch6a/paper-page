@@ -1,11 +1,14 @@
 """page.json to index.html: one self-contained file (no fonts, scripts or styles fetched from elsewhere; one small
-script for the copy button), light and dark, readable on a phone. Every text is HTML-escaped; links must be http(s)
+script for the copy button, allowed by its hash in the page's Content-Security-Policy), light and dark, readable on a
+phone. Every text is HTML-escaped; links must be http(s)
 and figures a path inside the page's folder or an https URL, anything else is left out and reported. The head carries
 the meta tags Google Scholar indexes (citation_*) and the Open Graph tags link previews read."""
 
 from __future__ import annotations
 
+import base64
 import datetime as dt
+import hashlib
 import html
 import posixpath
 import re
@@ -170,15 +173,34 @@ def render(page: Page) -> tuple[str, list[str]]:
         byline=f'<p class="byline">{"".join(byline)}</p>' if byline else "",
         sections="\n".join(sections),
         version=__version__,
+        script=SCRIPT,
+        csp=CSP,
     )
     return out, warnings
 
+
+SCRIPT = """
+"use strict";
+const copy = document.getElementById("copy");
+if (copy) copy.addEventListener("click", () => {
+  const text = document.getElementById("bibtex").textContent;
+  const done = () => { copy.textContent = "Copied"; setTimeout(() => { copy.textContent = "Copy"; }, 1500); };
+  if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, () => {});
+});
+"""
+# Defence in depth: should any text ever slip past the escaping, the browser still runs no script but the page's own
+# (allowed by its hash), loads nothing from elsewhere but images, and sends no form anywhere.
+CSP = (
+    "default-src 'none'; img-src 'self' https: data:; style-src 'unsafe-inline'; "
+    f"script-src 'sha256-{base64.b64encode(hashlib.sha256(SCRIPT.encode()).digest()).decode()}'; base-uri 'none'; form-action 'none'"
+)
 
 PAGE = """<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="{csp}">
 <title>{title}</title>
 {meta}
 <meta name="generator" content="paper-page {version}">
@@ -228,15 +250,7 @@ a{{color:var(--accent)}}
 {sections}
 </main>
 <footer>Made with <a href="https://github.com/zch6a/paper-page">paper-page</a>.</footer>
-<script>
-"use strict";
-const copy = document.getElementById("copy");
-if (copy) copy.addEventListener("click", () => {{
-  const text = document.getElementById("bibtex").textContent;
-  const done = () => {{ copy.textContent = "Copied"; setTimeout(() => {{ copy.textContent = "Copy"; }}, 1500); }};
-  if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, () => {{}});
-}});
-</script>
+<script>{script}</script>
 </body>
 </html>
 """

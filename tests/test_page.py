@@ -325,3 +325,17 @@ def test_an_svg_teaser_with_a_site_url_warns_about_link_previews() -> None:
 
 def test_no_arguments_prints_the_help(capsys: pytest.CaptureFixture[str]) -> None:
     assert cli.main([]) == 2 and "paper-page new 2003.08934" in capsys.readouterr().out
+
+
+def test_the_page_carries_a_policy_that_runs_only_its_own_script() -> None:
+    import base64
+    import hashlib
+    import re as regex
+
+    out, _ = render(page())
+    csp = regex.search(r'http-equiv="Content-Security-Policy" content="([^"]+)"', out)
+    script = regex.search(r"<script>(.*?)</script>", out, flags=regex.S)
+    assert csp and script
+    digest = base64.b64encode(hashlib.sha256(script.group(1).encode()).digest()).decode()
+    assert f"script-src 'sha256-{digest}'" in csp.group(1) and "default-src 'none'" in csp.group(1)
+    assert out.count("<script") == 1
