@@ -62,7 +62,8 @@ def to_text(s: str) -> str:
     s = re.sub(r"(?<!\\)\$", "", s)
     s = re.sub(r"\\[,;:! ]", " ", s)
     s = s.replace("{", "").replace("}", "")
-    return unicodedata.normalize("NFC", " ".join(s.split()))  # o + a combining diaeresis as one letter
+    s = re.sub(r"\s+([,.;:!?)])", r"\1", " ".join(s.split()))  # "quality \cite{x}, while": no space before the comma
+    return unicodedata.normalize("NFC", s)  # o + a combining diaeresis as one letter
 
 
 OPERATORS = {"log", "exp", "ln", "max", "min", "arg", "sin", "cos", "tan", "lim", "sup", "inf", "det", "dim", "argmax", "argmin"}
@@ -238,6 +239,36 @@ def figures(tex: str) -> list[TexFigure]:
         if g and not any(f.image == g.group(1).strip() for f in out):
             out.insert(0, TexFigure(g.group(1).strip(), command_arg(body, "caption") or ""))
     return out
+
+
+def macros(tex: str) -> dict[str, str]:
+    r"""The paper's own macros without arguments (\newcommand{\model}{SAM}, \def\ours{Tiny}), by name.
+
+    >>> macros(r"\newcommand{\model}{SAM\xspace} \newcommand\ours{Tiny} \def\etal{et al.} \newcommand{\f}[1]{#1}")
+    {'model': 'SAM', 'ours': 'Tiny', 'etal': 'et al.'}
+    """
+    out: dict[str, str] = {}
+    for m in re.finditer(r"\\(?:(?:re)?newcommand\*?|providecommand\*?)\s*\{?\\([A-Za-z]+)\}?\s*(\[|\{)|\\def\s*\\([A-Za-z]+)\s*(\{)", tex):
+        name, opener = (m.group(1), m.group(2)) if m.group(1) else (m.group(3), m.group(4))
+        if opener == "[":
+            continue  # it takes arguments: not expanded
+        body = braced(tex, m.end() - 1)[0]
+        out.setdefault(name, re.sub(r"\\xspace\b|\\@\s*", "", body).strip())
+    return out
+
+
+def use_macros(text: str, own: dict[str, str]) -> str:
+    r"""The text with the paper's own macros in place (nested ones too, three levels).
+
+    >>> use_macros(r"masks from \model{} and \ours.", {"model": "SAM", "ours": r"\model-2"})
+    'masks from SAM and SAM-2.'
+    """
+    if not own:
+        return text
+    pattern = re.compile(r"\\(" + "|".join(sorted(map(re.escape, own), key=len, reverse=True)) + r")(?![A-Za-z])(?:\{\})?")
+    for _ in range(3):
+        text = pattern.sub(lambda m: own[m.group(1)], text)
+    return text
 
 
 WEB_IMAGES = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg")

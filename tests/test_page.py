@@ -186,6 +186,7 @@ def test_page_json_round_trips_and_wrong_fields_are_named() -> None:
 def fake(monkeypatch: pytest.MonkeyPatch) -> FakeArxiv:
     f = FakeArxiv()
     monkeypatch.setattr(cli, "Client", lambda: Client(get=f, sleep=lambda _: None))
+    monkeypatch.setattr(cli, "find_converter", lambda: None)  # no pdftoppm, whatever this machine has
     return f
 
 
@@ -242,3 +243,59 @@ def test_errors_are_one_line_and_exit_2(tmp_path: Path, fake: FakeArxiv, capsys:
     assert cli.main(["new", "-o", str(tmp_path / "p")]) == 2
     assert cli.main(["render", str(tmp_path / "nowhere")]) == 2
     assert "cannot be read" in capsys.readouterr().err
+
+
+def fake_converter(pdf: bytes) -> bytes | None:
+    return png(3, 2) if pdf.startswith(b"%PDF") and b"broken" not in pdf else None
+
+
+def test_pdf_figures_are_converted_when_a_converter_is_there() -> None:
+    files = {
+        "main.tex": rb"""\documentclass{article}\begin{document}
+\begin{figure}\includegraphics{teaser}\caption{Teaser.}\end{figure}
+\begin{figure}\includegraphics{bad}\caption{Broken.}\end{figure}
+\begin{figure}\includegraphics{ok}\caption{Fine.}\end{figure}\end{document}""",
+        "teaser.pdf": b"%PDF-1.4 teaser",
+        "bad.pdf": b"%PDF-1.4 broken",
+        "ok.png": png(),
+    }
+    figs = take_figures(files, 4, convert=fake_converter)
+    assert figs.teaser == Figure("figures/fig-1.png", "Teaser.", "Teaser.") and figs.images["figures/fig-1.png"] == png(3, 2)
+    assert figs.converted == ["teaser.pdf"] and figs.skipped == ["bad.pdf"] and [f.src for f in figs.figures] == ["figures/fig-2.png"]
+    assert take_figures(files, 4, convert=lambda pdf: b"not a png").teaser is None  # an answer that is not a PNG is not used
+
+
+def test_the_cli_converts_with_pdftoppm_unless_told_not_to(tmp_path: Path, fake: FakeArxiv, monkeypatch: pytest.MonkeyPatch,
+                                                           capsys: pytest.CaptureFixture[str]) -> None:  # fmt: skip
+    monkeypatch.setattr(cli, "find_converter", lambda: fake_converter)
+    assert cli.main(["new", "2401.01234", "-o", str(tmp_path / "a")]) == 0
+    assert "3 taken, 1 of them converted from PDF" in capsys.readouterr().out
+    assert cli.main(["new", "2401.01234", "-o", str(tmp_path / "b"), "--no-convert"]) == 0
+    text = capsys.readouterr().out
+    assert "2 taken" in text and "skipped: figs/plot.pdf" in text and "pdftoppm installed" not in text
+
+
+def test_without_pdftoppm_the_report_says_how_to_get_conversion(tmp_path: Path, fake: FakeArxiv, capsys: pytest.CaptureFixture[str]) -> None:
+    assert cli.main(["new", "2401.01234", "-o", str(tmp_path / "a")]) == 0
+    assert "with poppler's pdftoppm installed" in capsys.readouterr().out
+
+
+def test_a_converted_photo_may_come_back_as_jpeg_and_macros_are_used_in_captions() -> None:
+    files = {
+        "main.tex": rb"""\documentclass{article}\newcommand{\model}{SAM\xspace}\begin{document}
+\begin{figure}\includegraphics{photo}\caption{Masks from \model{} at quality \cite{x}, here.}\end{figure}\end{document}""",
+        "photo.pdf": b"%PDF-1.4 photo",
+    }
+    figs = take_figures(files, 4, convert=lambda pdf: b"\xff\xd8\xff\xe0 a jpeg")
+    assert figs.teaser == Figure("figures/fig-1.jpg", "Masks from SAM at quality, here.", "Masks from SAM at quality, here.")
+
+
+def test_force_clears_the_old_figures_paper_page_made_and_nothing_else(tmp_path: Path, fake: FakeArxiv) -> None:
+    out = tmp_path / "page"
+    (out / "figures").mkdir(parents=True)
+    for name in ("fig-1.jpg", "fig-9.png", "my-diagram.png", "fig-notes.txt"):
+        (out / "figures" / name).write_bytes(b"old")
+    (out / "page.json").write_text("{}", encoding="utf-8")
+    assert cli.main(["new", "2401.01234", "-o", str(out), "--force"]) == 0
+    assert sorted(p.name for p in (out / "figures").iterdir()) == ["fig-1.png", "fig-2.jpg", "fig-notes.txt", "my-diagram.png"]
+    assert (out / "figures" / "fig-2.jpg").read_bytes() != b"old"

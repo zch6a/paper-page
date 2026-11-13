@@ -21,7 +21,7 @@ def test_the_example_page_is_current_and_renders_without_warnings() -> None:
 
 def test_the_readme_options_are_the_cli_options() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    documented = set(re.findall(r"^\| `(--?[a-z]+)", readme, flags=re.M))
+    documented = set(re.findall(r"^\| `(--?[a-z][a-z-]*)", readme, flags=re.M))
     help_text = cli.__doc__ or ""
-    assert documented == {"-o", "--figures", "--tex", "--force"}
+    assert documented == {"-o", "--figures", "--tex", "--no-convert", "--force"}
     assert "paper-page render" in help_text and "paper-page new" in help_text

@@ -32,8 +32,7 @@ uvx --from git+https://github.com/zch6a/paper-page paper-page new 2003.08934 -o 
 paper-page: NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis
   6 author(s), from arXiv:2003.08934v2; venue: ECCV 2020 (oral)
   links: arXiv, PDF, Project page
-  figures: 3 taken
-  the teaser is a PDF (figs/teaser_small.pdf): no teaser on the page; convert it to PNG (...)
+  figures: 4 taken, 3 of them converted from PDF with pdftoppm (teaser: figures/fig-1.png)
 ```
 
 ## What it takes from arXiv
@@ -41,12 +40,13 @@ paper-page: NeRF: Representing Scenes as Neural Radiance Fields for View Synthes
 - **Title, authors, abstract**, with simple TeX math as text (`$O(n^2)$` → O(n²), `\alpha` → α); affiliations when
   arXiv has them.
 - **The venue**, when arXiv's comment names it plainly ("ECCV 2020 (oral)", "Accepted to ICLR 2024"); never guessed.
-- **Links**: arXiv, PDF and DOI, plus the code, video, data and project page links found in the abstract and comment
-  (GitHub → Code, YouTube → Video, Hugging Face datasets → Data).
-- **Figures** from the paper's source: the first figure is the teaser, the next ones follow, each with its caption.
-  Only images a browser shows as they are (PNG, JPEG, GIF, WebP, SVG) are copied; a PDF figure is listed for you to
-  convert (`pdftoppm -png -r 200 -singlefile fig.pdf fig`). When the first figure is a PDF the page has no teaser
-  rather than a later figure in its place.
+- **Links**: arXiv, PDF and DOI, plus the code, video, data and project page links found in the abstract and comment,
+  labelled by the words before them ("our code is at ...") or where they go (GitHub → Code, YouTube → Video).
+- **Figures** from the paper's source: the first figure is the teaser, the next ones follow, each with its caption
+  (the paper's own simple macros expanded, citations left out). PNG, JPEG, GIF, WebP and SVG are copied as they are;
+  **PDF figures are converted** (first page, 1600 pixels wide; a photo-heavy one as JPEG when smaller) when poppler's
+  `pdftoppm` is installed, which MiKTeX includes; without it they are listed for you to convert. When the first figure
+  cannot be shown, the page has no teaser rather than a later figure in its place.
 - **BibTeX**: arXiv's fields (eprint, archivePrefix, primaryClass), the title's capitals protected.
 - **For search and sharing**: `citation_title`, `citation_author`, `citation_publication_date`, `citation_arxiv_id`,
   `citation_pdf_url` (what Google Scholar reads); `og:title`, `og:description` and, with `site_url` set, `og:image`
@@ -61,7 +61,8 @@ venue, more figures (`{"src": "figures/x.png", "caption": "..."}`), the accent c
 paper-page render page/
 ```
 
-`new` never overwrites an existing `page.json` (your edits are in it); `--force` starts over. Before the paper is on
+`new` never overwrites an existing `page.json` (your edits are in it); `--force` starts over (and clears the
+`figures/fig-N` files it made before; other files there are yours and stay). Before the paper is on
 arXiv: `paper-page new --tex paper/main.tex -o page/` reads the title, authors, abstract and figures from your TeX.
 
 | Option | |
@@ -69,6 +70,7 @@ arXiv: `paper-page new --tex paper/main.tex -o page/` reads the title, authors, 
 | `-o DIR` | the page's folder (default `page/`) |
 | `--figures N` | take up to N figures (default 4; `0` fetches no source at all) |
 | `--tex FILE` | from a TeX project instead of arXiv |
+| `--no-convert` | leave PDF figures out instead of converting them with `pdftoppm` |
 | `--force` | replace an existing `page.json` |
 
 ## Publish it
@@ -104,7 +106,8 @@ jobs:
 
 paper-page talks to arXiv only (`export.arxiv.org` for the metadata, `arxiv.org/e-print` for the source), one request
 every three seconds as arXiv asks, with a User-Agent naming the tool. The source is read in memory and never
-extracted: only the chosen images are written, under names it makes (`figures/fig-1.png`). The page loads nothing
+extracted: only the chosen images are written, under names it makes (`figures/fig-1.png`). A PDF figure is converted
+by running `pdftoppm` (no shell, a time limit, a temporary folder removed after). The page loads nothing
 from anywhere else; every text is escaped, and links must be http(s). See [SECURITY.md](SECURITY.md).
 
 ## Also in this toolkit

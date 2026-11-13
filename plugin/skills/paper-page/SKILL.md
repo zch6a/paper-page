@@ -16,13 +16,14 @@ uvx --from git+https://github.com/zch6a/paper-page paper-page render page/      
 ```
 
 - `new` writes `page/page.json` (everything on the page) and `page/index.html`, and copies the teaser and figures
-  (web formats only) into `page/figures/`. Read its report back to the user: the venue it found (or that none was
+  (PDF ones converted when it can) into `page/figures/`. Read its report back to the user: the venue it found (or that none was
   named), the links, the figures taken and any skipped.
 - **Ask the user for what arXiv does not have** and put it in `page.json`, then `render`: author homepages and
   affiliations, code/video/data links not in the abstract, the venue, `site_url` (where the page will live; needed
   for the teaser in link previews). Never invent a link, an affiliation or a venue.
-- A figure reported as a PDF (often the teaser) must be converted to PNG to show; with poppler installed:
-  `pdftoppm -png -r 200 -singlefile fig.pdf page/figures/teaser`, then set `teaser.src` to `figures/teaser.png`.
+- PDF figures (often the teaser) are converted automatically when poppler's `pdftoppm` is installed (MiKTeX
+  includes it). If the report lists one as skipped, convert it by hand (`pdftoppm -png -r 200 -singlefile fig.pdf
+  page/figures/teaser`) and set `teaser.src` to `figures/teaser.png`; installing software is the user's call.
 - `new` refuses to overwrite an existing `page.json` (the user's edits are in it); use `--force` only when the user
   wants to start over.
 - To publish: write the page to `docs/` and use Settings → Pages → Deploy from a branch (main, /docs), or the README's

@@ -11,11 +11,13 @@ site_url (where the page will live: link previews then show the teaser). Publish
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
 from . import __version__
 from .arxiv import ArxivError, Client, parse_id
+from .convert import find_converter
 from .make import Figures, from_entry, from_tex, take_figures
 from .model import Page
 from .render import render
@@ -38,6 +40,7 @@ def main(argv: list[str] | None = None) -> int:
     n.add_argument("--tex", type=Path, help="the main .tex file of a paper not on arXiv yet (instead of an ID)")
     n.add_argument("-o", "--out", type=Path, default=Path("page"), help="the page's folder (default page/)")
     n.add_argument("--figures", type=int, default=4, metavar="N", help="take the first N figures, the first as the teaser (default 4; 0 for none)")
+    n.add_argument("--no-convert", action="store_true", help="leave PDF figures out instead of converting them with pdftoppm (when installed)")
     n.add_argument("--force", action="store_true", help="replace an existing page.json (your edits in it are lost)")
     r = sub.add_parser("render", help="make index.html again from the folder's page.json")
     r.add_argument("folder", type=Path, nargs="?", default=Path("page"), help="the page's folder (default page/)")
@@ -71,14 +74,19 @@ def _new(args: argparse.Namespace) -> int:
         page = from_entry(client.metadata(arxiv_id, version), arxiv_id)
         files, main_name = {}, None
         if args.figures:
+            print(f"paper-page: fetching arXiv:{arxiv_id}{page.version}'s source for its figures (--figures 0 skips this)", file=sys.stderr)
             kind, blob = client.source(arxiv_id, version)
             files = read_source(blob)
             if not files:
                 print(f"paper-page: arXiv has no TeX source for {arxiv_id} ({kind or 'unknown type'}): no figures taken", file=sys.stderr)
         source_note = f"from arXiv:{arxiv_id}{page.version}"
-    figs = take_figures(files, args.figures, main_name) if files else Figures()
+    convert = None if args.no_convert else find_converter()
+    figs = take_figures(files, args.figures, main_name, convert) if files else Figures()
     page.teaser, page.figures = figs.teaser, figs.figures
     out.mkdir(parents=True, exist_ok=True)
+    for old in (out / "figures").glob("fig-*.*") if args.force else ():
+        if re.fullmatch(r"fig-\d+\.(png|jpg|gif|webp|svg)", old.name):  # only the files paper-page names: yours stay
+            old.unlink()
     for rel, data in figs.images.items():
         target = out / rel
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -90,14 +98,18 @@ def _new(args: argparse.Namespace) -> int:
     print(f"  {len(page.authors)} author(s), {source_note}" + (f"; venue: {page.venue}" if page.venue else "; no venue named (set it in page.json)"))
     found = [x.label for x in page.links if x.label not in ("arXiv", "PDF", "DOI")]
     print("  links: " + ", ".join(x.label for x in page.links) + ("" if found else " (add code, video, data in page.json)"))
-    print(f"  figures: {len(figs.images)} taken" + (f" (teaser: {page.teaser.src})" if page.teaser else ""))
+    converted = f", {len(figs.converted)} of them converted from PDF with pdftoppm" if figs.converted else ""
+    print(f"  figures: {len(figs.images)} taken{converted}" + (f" (teaser: {page.teaser.src})" if page.teaser else ""))
     if figs.teaser_skipped:
         name = figs.teaser_skipped.rsplit("/", 1)[-1]
-        print(f"  the teaser is a PDF ({figs.teaser_skipped}): no teaser on the page; convert it to PNG (e.g. "
+        why = "could not be converted" if convert is not None and name.lower().endswith(".pdf") else "is not in a web format"
+        print(f"  the teaser ({figs.teaser_skipped}) {why}: no teaser on the page; convert it to PNG (e.g. "
               f"`pdftoppm -png -r 200 -singlefile {name} teaser`), put it in {out.as_posix()}/figures/ and set teaser.src in page.json")  # fmt: skip
     for s in figs.skipped:
         if s != figs.teaser_skipped:
             print(f"  figure not in a web format, skipped: {s} (convert it to PNG and add it to page.json)")
+    if convert is None and not args.no_convert and any(s.lower().endswith(".pdf") for s in figs.skipped):
+        print("  (with poppler's pdftoppm installed, PDF figures are converted for you; MiKTeX includes it)")
     for w in warnings:
         print(f"paper-page: warning: {w}", file=sys.stderr)
     print(f"  -> {(out / 'index.html').as_posix()}; edit {(out / 'page.json').as_posix()}, then `paper-page render {out.as_posix()}`")

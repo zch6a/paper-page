@@ -11,8 +11,9 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 
 from .arxiv import ARXIV, ATOM
+from .convert import Converter
 from .model import Author, Figure, Link, Page
-from .tex import WEB_IMAGES, command_arg, expand, figures, find_image, graphicspath, main_file, to_text
+from .tex import WEB_IMAGES, command_arg, expand, figures, find_image, graphicspath, macros, main_file, to_text, use_macros
 
 URL = re.compile(r"https?://[^\s<>\"'{}\\]+")
 
@@ -38,7 +39,7 @@ def from_entry(entry: ET.Element, arxiv_id: str) -> Page:
         categories.insert(0, primary.get("term", ""))
     doi = (entry.findtext(f"{ARXIV}doi") or "").strip()
     links = [Link("arXiv", f"https://arxiv.org/abs/{arxiv_id}"), Link("PDF", f"https://arxiv.org/pdf/{arxiv_id}")]
-    links += found_links(abstract_tex + " " + comment)
+    links += [x for x in found_links(comment) + found_links(abstract_tex) if x.label not in {y.label for y in links}]
     if doi:
         links.insert(1, Link("DOI", f"https://doi.org/{doi}"))
     page = Page(
@@ -58,10 +59,13 @@ def from_entry(entry: ET.Element, arxiv_id: str) -> Page:
 
 
 def found_links(text: str) -> list[Link]:
-    """Links named in an abstract or a comment, labelled by where they go (the first of each kind, in order).
+    """Links named in an abstract or a comment, labelled by the word just before them ("code at ...") or else by where
+    they go (the first of each kind, in order).
 
     >>> [(x.label, x.url) for x in found_links("Code: https://github.com/a/b. Video at https://youtu.be/x; see http://tancik.com/nerf")]
     [('Code', 'https://github.com/a/b'), ('Video', 'https://youtu.be/x'), ('Project page', 'http://tancik.com/nerf')]
+    >>> [(x.label, x.url) for x in found_links("Our code is released at https://lab.example.org/tiny and data at https://example.org/d")]
+    [('Code', 'https://lab.example.org/tiny'), ('Data', 'https://example.org/d')]
     """
     out: list[Link] = []
     seen: set[str] = set()
@@ -72,7 +76,10 @@ def found_links(text: str) -> list[Link]:
         host = re.sub(r"^https?://(www\.)?", "", url).split("/")[0].lower()
         if host.endswith("arxiv.org") or url in seen:
             continue
-        if host in ("github.com", "gitlab.com", "bitbucket.org", "codeberg.org"):
+        said = _said(re.split(r"[.;!?](?:\s|$)", text[max(0, m.start() - 60) : m.start()])[-1])  # within its own sentence
+        if said:
+            label = said
+        elif host in ("github.com", "gitlab.com", "bitbucket.org", "codeberg.org"):
             label = "Code"
         elif host in ("youtube.com", "youtu.be", "vimeo.com", "m.youtube.com"):
             label = "Video"
@@ -87,6 +94,26 @@ def found_links(text: str) -> list[Link]:
         seen.add(url)
         out.append(Link(label, url))
     return out
+
+
+SAID = {"code": "Code", "implementation": "Code", "source": "Code", "video": "Video", "videos": "Video", "data": "Data",
+        "dataset": "Data", "datasets": "Data", "demo": "Demo"}  # fmt: skip
+PAGE_WORDS = {"project", "website", "homepage", "webpage"}
+
+
+def _said(before: str) -> str:
+    """The kind of link the words just before it name: a project page first ("Project page with videos and code: ..."
+    is one page holding both), else the nearest keyword ("our code is at ..."), else "".
+
+    >>> [x.label for x in found_links("on several established datasets. https://repo.example.org/gs/")]
+    ['Project page']
+    >>> _said("Project page with videos and code: "), _said("Our code is released at "), _said("as shown in ")
+    ('Project page', 'Code', '')
+    """
+    words = re.findall(r"[a-z]+", before.lower())[-6:]
+    if PAGE_WORDS & set(words):
+        return "Project page"
+    return next((SAID[w] for w in reversed(words) if w in SAID), "")
 
 
 # a venue's name has capitals inside it (NeurIPS, CVPR, ECCV, ICML-W): matched case-sensitively; the words around it not
@@ -175,34 +202,50 @@ class Figures:
     images: dict[str, bytes] = field(default_factory=dict)  # path in the page folder -> the image
     skipped: list[str] = field(default_factory=list)  # figures not in a web format (PDF, EPS): to convert by hand
     teaser_skipped: str = ""  # the paper's first figure, when it is one of those: the page then has no teaser
+    converted: list[str] = field(default_factory=list)  # PDF figures converted to PNG
 
 
-def take_figures(files: dict[str, bytes], limit: int, main: str | None = None) -> Figures:
+def take_figures(files: dict[str, bytes], limit: int, main: str | None = None, convert: Converter | None = None) -> Figures:
     """Up to `limit` figures of a source, copied as figures/fig-N.ext when a browser shows them as they are (PNG,
-    JPEG, GIF, WebP, SVG); the others (PDF, EPS) listed as skipped. The paper's first figure is the teaser, and only
-    it: when it is a PDF, the page has no teaser rather than a later figure in its place."""
+    JPEG, GIF, WebP, SVG), PDF figures converted to PNG with `convert` when given; the others listed as skipped. The
+    paper's first figure is the teaser, and only it: when it cannot be shown, the page has no teaser rather than a
+    later figure in its place."""
     out = Figures()
     main = main or main_file(files)
     if main is None or limit <= 0:
         return out
     tex = expand(main, files)
     gp = graphicspath(tex)
+    own = macros(tex)
     n = 0
     for i, f in enumerate(x for x in figures(tex) if find_image(x.image, files, main, gp)):
         if n >= limit:
             break
         found = find_image(f.image, files, main, gp) or ""
         ext = posixpath.splitext(found)[1].lower()
-        if ext not in WEB_IMAGES:
+        data: bytes | None = files[found]
+        if ext == ".pdf" and convert is not None:
+            data = convert(files[found])
+            kind = (
+                ".png"
+                if data is not None and data[:8] == b"\x89PNG\r\n\x1a\n"
+                else ".jpg"
+                if data is not None and data[:3] == b"\xff\xd8\xff"
+                else ""
+            )
+            if kind:
+                ext = kind
+                out.converted.append(found)
+        if ext not in WEB_IMAGES or data is None:
             out.skipped.append(found)
             if i == 0:
                 out.teaser_skipped = found
             continue
         n += 1
         src = f"figures/fig-{n}{'.jpg' if ext == '.jpeg' else ext}"
-        caption = to_text(f.caption)
+        caption = to_text(use_macros(f.caption, own))
         figure = Figure(src, caption, alt=caption[:150])
-        out.images[src] = files[found]
+        out.images[src] = data
         if i == 0:
             out.teaser = figure
         else:

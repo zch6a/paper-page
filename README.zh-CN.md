@@ -30,9 +30,10 @@ uvx --from git+https://github.com/zch6a/paper-page paper-page new 2003.08934 -o 
 
 - **标题、作者、摘要**，简单的 TeX 公式转成文字（`$O(n^2)$` → O(n²)，`\alpha` → α）；arXiv 有单位信息时一并取出。
 - **会议**：只有 arXiv 的 comment 明确写出时才填（“ECCV 2020 (oral)”“Accepted to ICLR 2024”），从不猜。
-- **链接**：arXiv、PDF、DOI，以及摘要和 comment 里出现的代码、视频、数据、项目主页链接（GitHub → Code，YouTube → Video，Hugging Face 数据集 → Data）。
-- **图**：从论文源码里取，第一张图作预览图，后面的依次排列，各带图注。只复制浏览器能直接显示的图片（PNG、JPEG、GIF、WebP、SVG）；
-  PDF 格式的图会列出来请你转换（`pdftoppm -png -r 200 -singlefile fig.pdf fig`）。第一张图是 PDF 时页面就不放预览图，不会拿后面的图顶替。
+- **链接**：arXiv、PDF、DOI，以及摘要和 comment 里出现的代码、视频、数据、项目主页链接，按链接前面的词（“our code is at ...”）或网址（GitHub → Code，YouTube → Video）命名。
+- **图**：从论文源码里取，第一张图作预览图，后面的依次排列，各带图注（论文自定义的简单宏会展开，引用标记去掉）。PNG、JPEG、GIF、WebP、SVG 原样复制；
+  装有 poppler 的 `pdftoppm` 时（MiKTeX 自带）**PDF 图会自动转换**（第一页，宽 1600 像素；照片多的图在更小时存成 JPEG），没有则列出来请你转换。
+  第一张图无法显示时页面就不放预览图，不会拿后面的图顶替。
 - **BibTeX**：arXiv 的字段（eprint、archivePrefix、primaryClass），标题大小写加花括号保护。
 - **搜索与分享**：`citation_title`、`citation_author`、`citation_publication_date`、`citation_arxiv_id`、`citation_pdf_url`（Google Scholar 读这些）；
   `og:title`、`og:description`，设置了 `site_url` 时还有 `og:image`（链接预览里显示预览图）。
@@ -45,7 +46,7 @@ uvx --from git+https://github.com/zch6a/paper-page paper-page new 2003.08934 -o 
 paper-page render page/
 ```
 
-`new` 不会覆盖已有的 `page.json`（你的修改在里面），`--force` 才重新开始。论文还没上 arXiv 时：`paper-page new --tex paper/main.tex -o page/`
+`new` 不会覆盖已有的 `page.json`（你的修改在里面），`--force` 才重新开始（并清掉它之前生成的 `figures/fig-N` 文件，那里你自己的文件不动）。论文还没上 arXiv 时：`paper-page new --tex paper/main.tex -o page/`
 从你的 TeX 读标题、作者、摘要和图。
 
 | 选项 | |
@@ -53,6 +54,7 @@ paper-page render page/
 | `-o DIR` | 页面所在文件夹（默认 `page/`） |
 | `--figures N` | 最多取 N 张图（默认 4；`0` 则完全不下载源码） |
 | `--tex FILE` | 从 TeX 工程生成，而不是 arXiv |
+| `--no-convert` | 不用 `pdftoppm` 转换 PDF 图，直接略过 |
 | `--force` | 覆盖已有的 `page.json` |
 
 ## 发布
@@ -63,7 +65,7 @@ paper-page render page/
 ## 隐私与安全
 
 paper-page 只访问 arXiv（元数据走 `export.arxiv.org`，源码走 `arxiv.org/e-print`），按 arXiv 的要求每三秒最多一次请求，User-Agent 只写工具名。
-源码只在内存里读取，从不解压到磁盘：只写出选中的图片，文件名由工具生成（`figures/fig-1.png`）。生成的页面不从任何别的地方加载资源；
+源码只在内存里读取，从不解压到磁盘：只写出选中的图片，文件名由工具生成（`figures/fig-1.png`）。PDF 图通过运行 `pdftoppm` 转换（不经过 shell，有时间限制，临时文件夹用完即删）。生成的页面不从任何别的地方加载资源；
 所有文字都经过转义，链接只允许 http(s)。详见 [SECURITY.md](SECURITY.md)。
 
 ## 许可证
